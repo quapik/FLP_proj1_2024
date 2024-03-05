@@ -1,53 +1,61 @@
 --Vojtěch Šíma, xsimav01, 2024
 -- FLP Funkcionalni projekt
+{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
+{-# HLINT ignore "Use <$>" #-}
 import System.Environment (getArgs)
 import System.IO (openFile, hGetContents)
 import Control.Monad
 import Text.Parsec
-    ((<|>), anyChar, option, newline, manyTill, char, digit, spaces, string, many1, sepEndBy, endBy, parse, many, noneOf, Parsec )
+    ((<|>), anyChar, try, option, newline, manyTill, char, digit, spaces, string, many1, sepEndBy, endBy, parse, many, noneOf)
 import Text.Parsec.String (Parser)
-import Distribution.Simple.Command (ShowOrParseArgs(ParseArgs))
 
 
---Kontrola správně zadaných argumentů
+--Kontrola správně zadaných argumentů, pouze dvě možnosti, jinak chyba
 argsChecker ::  [String] -> Bool
 argsChecker [x,_] = x == "-2" 
 argsChecker [x,_,_] = x == "-1"
 argsChecker _  = False
 
+--Extraktuje nazvy souboru u argumentu do tuplu
 fileExtract :: [String] -> (String, String)
 fileExtract [_, file] = (file, "")
 fileExtract [_, file1, file2] = (file1,file2)
 fileExtract [_] = ("", "")
 
-readTreeFile :: FilePath -> Tree
-readTreeFile treeFile =  nodeParser (readFile treeFile)
+readTreeInputAndParse :: FilePath -> IO Tree
+readTreeInputAndParse inputFile =  do
+  input <- readFile inputFile
+  case parse startParse  "" input of
+    Left err -> error $ "Error parsing tree file: " ++ show err --TODO ERROR HANDLER
+    Right loadedTree -> return loadedTree
+
+startParse :: Text.Parsec.String.Parser Tree
+startParse =  nodeParser <|> leafParser 
 
 data Tree = Leaf String | Node Int Double Tree Tree deriving Show
 
-leafParser :: Parser Tree
+leafParser :: Text.Parsec.String.Parser Tree
 leafParser = do
   spaces
   string "Leaf: "
   trida <-  manyTill anyChar newline 
-  char '\n'
   return (Leaf trida)
 
-nodeParser :: Parser Tree
+nodeParser :: Text.Parsec.String.Parser Tree
 nodeParser = do
-  spaces --jsou tu ty spaces potreba?
+  spaces --kvuli odsazeni
   string "Node: "
   index_priznaku <- many1 digit
-  char ','
+  string ", "
   prah_cela <- many1 digit
   char '.'
-  prah_desetinna <- many1 digit
-  l <- nodeParser
-  spaces
-  char '\n'
-  r <- nodeParser
-  return (Node (read index_priznaku) (read (prah_cela ++ "." ++ prah_desetinna)) l r) --tohle asi upravit, melo by to jit i jinak
-  <|> leafParser
+  prah_desetinna <- manyTill digit newline 
+  l <- try leafParser  <|> try nodeParser
+   --spaces
+  --char '\n'
+  r <- try leafParser  <|> try nodeParser
+  return (Node (read index_priznaku) (read (prah_cela ++ "." ++ prah_desetinna)) l r) 
+
 
 --SKOPIROVANY, ODSTRAN!
 printTree :: Tree -> String
@@ -61,10 +69,10 @@ printTree (Node id threshold left right) =
 main :: IO()
 main = do
     args <- getArgs
-    if (argsChecker args) then  do
-       let (file1, file2) = (fileExtract args)
+    if argsChecker args then  do
+       let (file1, file2) = fileExtract args
        --if file2 == "" then putStr ("jedna") else putStr "dva" 
-       content <- readTreeFile file1
+       content <- readTreeInputAndParse file1
        putStrLn (printTree content)
        putStrLn ("ST")
     else do
