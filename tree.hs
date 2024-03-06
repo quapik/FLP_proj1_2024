@@ -1,14 +1,13 @@
 --Vojtěch Šíma, xsimav01, 2024
 -- FLP Funkcionalni projekt
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-{-# HLINT ignore "Use <$>" #-}
 import System.Environment (getArgs)
-import System.IO (openFile, hGetContents,isEOF)
+import System.IO (openFile, hGetContents, hSetEncoding, hClose, IOMode (ReadMode))
 import Text.Parsec
-    ((<|>), anyChar, oneOf, anyToken, try, alphaNum, space, option, newline, manyTill, char, digit, spaces, string, many1, sepEndBy, endBy, parse, many, noneOf)
+    ((<|>), anyChar, oneOf,try, alphaNum, space, newline, manyTill, char, digit, spaces, string, many1, sepEndBy, endBy, parse, many, noneOf)
 import Text.Parsec.String (Parser)
 import Control.Monad (replicateM)
 import Text.Parsec.Combinator(eof)
+import GHC.IO.Encoding (getLocaleEncoding, utf8)
 
 
 --Kontrola správně zadaných argumentů, pouze dvě možnosti, jinak chyba
@@ -23,15 +22,19 @@ fileExtract [_, file] = (file, "")
 fileExtract [_, file1, file2] = (file1,file2)
 fileExtract [_] = ("", "")
 
+data Tree = Leaf String | Node Int Double Tree Tree deriving Show
+------------------------------------SOUBOR SE STROMEM
 --Přečtení souboru se stromem a spuštění jeho parseru. Pokud uspěje, vrátí se načtený strom, jinak chyba
 readTreeInputAndParse :: FilePath -> IO Tree
 readTreeInputAndParse inputFile =  do
-  input <- readFile inputFile
+  --Kvůli tomu aby se vpohodě načítala diakritika a dalo se s ní pracovat
+  fileHandle <- openFile inputFile ReadMode
+  hSetEncoding fileHandle utf8
+  input <- hGetContents fileHandle
+  -- input <- readFile inputFile -- tohle pokud neresis to UTF
   case parse (nodeParser 0)  "" input of
-    Left err -> error $ "Chyba pri nacitani vstupniho soboru se stromem: " ++ show err --TODO ERROR HANDLER
+    Left err -> error $  "Chyba pri nacitani vstupniho soboru se stromem: " ++ show err --TODO ERROR HANDLER
     Right loadedTree -> return loadedTree
-
-data Tree = Leaf String | Node Int Double Tree Tree deriving Show
 
 --Vyzkouší všechny parsery co mohou být 
 tryParsers :: Int -> Parser Tree
@@ -77,17 +80,33 @@ printTree (Node id threshold left right) =
   "Node: " ++ show id ++ ", " ++ show threshold ++ "\n" ++
   printTree left ++
   printTree right
+  
+------------------------------------SOUBOR s FLOATAMA
+--Funkce dostane načtený soubor rozdělený do listu podle řádků a vrací list listů floatů s jednotlivými body
+fileStringToFloats :: [String] -> [[Float]]
+fileStringToFloats [] = []
+fileStringToFloats (x:xs)  = splitString x : fileStringToFloats xs
 
+-- Funkce, co dostane string, oddělí první substring před čárkou, ten převede na float, zbatek zbaví té čárky a rekurzivně volá
+splitString :: String -> [Float]
+splitString "" = []
+splitString str = 
+    let (x, xs_w_splitter) = break (==',') str
+        (_, xs) = span (==',') xs_w_splitter
+     in read x : splitString xs
 
 main :: IO()
 main = do
     args <- getArgs
     if argsChecker args then  do
        let (file1, file2) = fileExtract args
-       --if file2 == "" then putStr ("jedna") else putStr "dva" 
-       content <- readTreeInputAndParse file1
-       putStr (printTree content)
+       file1_content <- readTreeInputAndParse file1
+       putStr (printTree file1_content)
+
+       file2_content <- readFile file2
+       let res = fileStringToFloats (lines file2_content)
+       print res
+       
     else do
         putStr "Chyba pri spousteni projektu! Jedine mozne formy jsou: \n flp-fun -1 <soubor obsahujici strom> <soubor obsahujici nove data> \n flp-fun -2 <soubor obsahujici trenovaci data> "
-    
     return ()

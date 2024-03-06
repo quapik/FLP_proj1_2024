@@ -1,36 +1,40 @@
---Vojtěch Šíma, xsimav01, 2024
--- FLP Funkcionalni projekt
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-{-# HLINT ignore "Use <$>" #-}
 import System.Environment (getArgs)
-import System.IO (openFile, hGetContents)
-import Control.Monad
+import System.IO (openFile, hGetContents, hSetEncoding, hClose, IOMode (ReadMode))
 import Text.Parsec
-    ((<|>), anyChar, try, option, newline, manyTill, char, digit, spaces, string, many1, sepEndBy, endBy, parse, many, noneOf, Parsec)
+    ((<|>), anyChar, oneOf,try, alphaNum, space, newline, manyTill, char, digit, spaces, string, many1, sepEndBy, endBy, parse, many, noneOf)
+import Text.Parsec.String (Parser)
+import Control.Monad (replicateM)
+import Text.Parsec.Combinator(eof)
+import GHC.IO.Encoding (getLocaleEncoding, utf8)
+import Data.List (lines)
 
-mainParser :: Parsec String () String
-mainParser = do
-  result <- try (string "new" >> newParser) <|> try (string "call" >> callParser) <|> otherParser
-  return result
-  
-newParser :: Parsec String () String
-newParser = do
-  string "content"
-  return "New content"
+a :: [String] -> [[Float]]
+a [] = []
+a (x:xs)  = splitString x : a xs
 
-callParser :: Parsec String () String
-callParser = do
-  string "me"
-  return "Calling me"
+-- toFloat:: String -> [Float]
+-- toFloat [] = []
+-- --toFloat x = read (takeWhile (/=',') x) : toFloat (dropWhile (/=',')  x)
+-- toFloat x = 1.0 : toFloat (dropWhile (==',')  x)
 
-otherParser :: Parsec String () String
-otherParser = do
-  content <- many anyChar
-  return content
+-- pp :: Parser [Float]
+-- pp  = do
+--   prah_cela <- many1 digit
+--   char '.'
+--   prah_desetinna <- manyTill digit newline 
+--   x <- pp
+--   return ( (read (prah_cela ++ "." ++ prah_desetinna)) : x)
 
-main :: IO ()
+splitString :: String -> [Float]
+splitString "" = []
+splitString str = 
+    let (x, xs_w_splitter) = break (==',') str
+        (_, xs) = span (==',') xs_w_splitter
+     in read x : splitString xs
+
+main :: IO()
 main = do
-  let input = "callme"
-  case parse mainParser "" input of
-    Left err -> print err
-    Right result -> print result
+  input <- readFile "input2"
+  let res = a (lines input)
+  print res
+  return ()
