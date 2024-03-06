@@ -8,6 +8,8 @@ import Text.Parsec.String (Parser)
 import Control.Monad (replicateM)
 import Text.Parsec.Combinator(eof)
 import GHC.IO.Encoding (getLocaleEncoding, utf8)
+import Data.Array (Ix(index))
+import Text.XHtml (treeColors)
 
 
 --Kontrola správně zadaných argumentů, pouze dvě možnosti, jinak chyba
@@ -80,7 +82,7 @@ printTree (Node id threshold left right) =
   "Node: " ++ show id ++ ", " ++ show threshold ++ "\n" ++
   printTree left ++
   printTree right
-  
+
 ------------------------------------SOUBOR s FLOATAMA
 --Funkce dostane načtený soubor rozdělený do listu podle řádků a vrací list listů floatů s jednotlivými body
 fileStringToFloats :: [String] -> [[Float]]
@@ -95,6 +97,29 @@ splitString str =
         (_, xs) = span (==',') xs_w_splitter
      in read x : splitString xs
 
+prochazejData ::  Tree -> [[Float]] -> [String]
+prochazejData _ [] = []
+prochazejData tree (f:fs) = findInTree tree f : prochazejData tree fs
+
+findInTree :: Tree -> [Float] -> String
+-- findInTree tree floats =
+--  case getNodeIndex tree of
+--         Just index -> "Index nalezen: " ++ show index
+--         Nothing -> "Index nenalezen"
+findInTree tree floats = "asda"
+
+getNodeValue :: Tree -> Maybe Double
+getNodeValue (Node _ nodeValue _ _) = Just nodeValue
+getNodeValue(Leaf _) = Nothing
+
+getNodeIndex :: Tree -> Maybe Int
+getNodeIndex (Node index _ _ _) = Just index
+getNodeIndex (Leaf _) =  Nothing
+
+getLeafClass:: Tree -> String
+getLeafClass (Leaf trida) = trida
+
+
 main :: IO()
 main = do
     args <- getArgs
@@ -106,6 +131,9 @@ main = do
        file2_content <- readFile file2
        let res = fileStringToFloats (lines file2_content)
        print res
+
+       let res2 = prochazejData file1_content res
+       print res2
        
     else do
         putStr "Chyba pri spousteni projektu! Jedine mozne formy jsou: \n flp-fun -1 <soubor obsahujici strom> <soubor obsahujici nove data> \n flp-fun -2 <soubor obsahujici trenovaci data> "
