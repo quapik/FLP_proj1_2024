@@ -3,11 +3,12 @@
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# HLINT ignore "Use <$>" #-}
 import System.Environment (getArgs)
-import System.IO (openFile, hGetContents)
-import Control.Monad
+import System.IO (openFile, hGetContents,isEOF)
 import Text.Parsec
-    ((<|>), anyChar, try, option, newline, manyTill, char, digit, spaces, string, many1, sepEndBy, endBy, parse, many, noneOf)
+    ((<|>), anyChar, oneOf, anyToken, try, alphaNum, space, option, newline, manyTill, char, digit, spaces, string, many1, sepEndBy, endBy, parse, many, noneOf)
 import Text.Parsec.String (Parser)
+import Control.Monad (replicateM)
+import Text.Parsec.Combinator(eof)
 
 
 --Kontrola správně zadaných argumentů, pouze dvě možnosti, jinak chyba
@@ -22,38 +23,50 @@ fileExtract [_, file] = (file, "")
 fileExtract [_, file1, file2] = (file1,file2)
 fileExtract [_] = ("", "")
 
+--Přečtení souboru se stromem a spuštění jeho parseru. Pokud uspěje, vrátí se načtený strom, jinak chyba
 readTreeInputAndParse :: FilePath -> IO Tree
 readTreeInputAndParse inputFile =  do
   input <- readFile inputFile
-  case parse startParse  "" input of
-    Left err -> error $ "Error parsing tree file: " ++ show err --TODO ERROR HANDLER
+  case parse (nodeParser 0)  "" input of
+    Left err -> error $ "Chyba pri nacitani vstupniho soboru se stromem: " ++ show err --TODO ERROR HANDLER
     Right loadedTree -> return loadedTree
-
-startParse :: Text.Parsec.String.Parser Tree
-startParse =  nodeParser <|> leafParser 
 
 data Tree = Leaf String | Node Int Double Tree Tree deriving Show
 
-leafParser :: Text.Parsec.String.Parser Tree
-leafParser = do
-  spaces
+--Vyzkouší všechny parsery co mohou být 
+tryParsers :: Int -> Parser Tree
+tryParsers pocet_mezer =  try (leafParser $ pocet_mezer + 2)  <|> try (leafParserEOF $ pocet_mezer + 2) <|> try (nodeParser $ pocet_mezer + 2)
+
+--Zkontroluje odsazení, najde klíčové slovo Leaf:  a načte třídu pro daný Leaf
+leafParser :: Int -> Parser Tree
+leafParser pocet_mezer = do
+  odsazeni <- replicateM pocet_mezer space
   string "Leaf: "
-  trida <-  manyTill anyChar newline 
+  trida <-  manyTill anyChar newline
   return (Leaf trida)
 
-nodeParser :: Text.Parsec.String.Parser Tree
-nodeParser = do
-  spaces --kvuli odsazeni
+--Stejná funkce, ale pro pripad ze tam je eof -> krkolomné, ale nepodařilo se mi zkombinovat newline <|> eof v jedne funkci
+leafParserEOF :: Int -> Parser Tree
+leafParserEOF pocet_mezer = do
+  odsazeni <- replicateM pocet_mezer space
+  string "Leaf: "
+  trida <-  manyTill anyChar eof
+  return (Leaf trida)
+
+--Zkontroluje odsazení, najde klíčové slovo Node: , načte index příznaku a pak celou a desetinou část prahu (aby šlo na float)
+nodeParser :: Int -> Parser Tree
+nodeParser pocet_mezer = do
+  odsazeni <- replicateM pocet_mezer space
   string "Node: "
   index_priznaku <- many1 digit
   string ", "
   prah_cela <- many1 digit
   char '.'
   prah_desetinna <- manyTill digit newline 
-  l <- try leafParser  <|> try nodeParser
+  l <- tryParsers pocet_mezer
    --spaces
   --char '\n'
-  r <- try leafParser  <|> try nodeParser
+  r <- tryParsers pocet_mezer
   return (Node (read index_priznaku) (read (prah_cela ++ "." ++ prah_desetinna)) l r) 
 
 
@@ -73,8 +86,7 @@ main = do
        let (file1, file2) = fileExtract args
        --if file2 == "" then putStr ("jedna") else putStr "dva" 
        content <- readTreeInputAndParse file1
-       putStrLn (printTree content)
-       putStrLn ("ST")
+       putStr (printTree content)
     else do
         putStr "Chyba pri spousteni projektu! Jedine mozne formy jsou: \n flp-fun -1 <soubor obsahujici strom> <soubor obsahujici nove data> \n flp-fun -2 <soubor obsahujici trenovaci data> "
     
