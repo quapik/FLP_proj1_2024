@@ -8,8 +8,6 @@ import Text.Parsec.String (Parser)
 import Control.Monad (replicateM)
 import Text.Parsec.Combinator(eof)
 import GHC.IO.Encoding (getLocaleEncoding, utf8)
-import Data.Array (Ix(index))
-import Text.XHtml (treeColors)
 
 
 --Kontrola správně zadaných argumentů, pouze dvě možnosti, jinak chyba
@@ -24,17 +22,16 @@ fileExtract [_, file] = (file, "")
 fileExtract [_, file1, file2] = (file1,file2)
 fileExtract [_] = ("", "")
 
-data Tree = Leaf String | Node Int Double Tree Tree deriving Show
+data Tree = Leaf String | Node Int Float Tree Tree deriving Show
 ------------------------------------SOUBOR SE STROMEM
 --Přečtení souboru se stromem a spuštění jeho parseru. Pokud uspěje, vrátí se načtený strom, jinak chyba
-readTreeInputAndParse :: FilePath -> IO Tree
-readTreeInputAndParse inputFile =  do
-  --Kvůli tomu aby se vpohodě načítala diakritika a dalo se s ní pracovat
-  fileHandle <- openFile inputFile ReadMode
-  hSetEncoding fileHandle utf8
-  input <- hGetContents fileHandle
-  -- input <- readFile inputFile -- tohle pokud neresis to UTF
-  case parse (nodeParser 0)  "" input of
+readTreeInputAndParse :: FilePath -> IO Tree --co tu ten IO?
+readTreeInputAndParse inputFile =
+  --Open file místo read kvůli tomu aby se vpohodě načítala diakritika a dalo se s ní pracovat
+  openFile inputFile ReadMode >>= 
+  \fileHandle -> hSetEncoding fileHandle utf8 >>
+  hGetContents fileHandle >>= 
+  \input -> case parse (nodeParser 0)  "" input of
     Left err -> error $  "Chyba pri nacitani vstupniho soboru se stromem: " ++ show err --TODO ERROR HANDLER
     Right loadedTree -> return loadedTree
 
@@ -87,37 +84,43 @@ printTree (Node id threshold left right) =
 --Funkce dostane načtený soubor rozdělený do listu podle řádků a vrací list listů floatů s jednotlivými body
 fileStringToFloats :: [String] -> [[Float]]
 fileStringToFloats [] = []
-fileStringToFloats (x:xs)  = splitString x : fileStringToFloats xs
+fileStringToFloats (x:xs)  = splitOnString x : fileStringToFloats xs
 
 -- Funkce, co dostane string, oddělí první substring před čárkou, ten převede na float, zbatek zbaví té čárky a rekurzivně volá
-splitString :: String -> [Float]
-splitString "" = []
-splitString str = 
-    let (x, xs_w_splitter) = break (==',') str
-        (_, xs) = span (==',') xs_w_splitter
-     in read x : splitString xs
+-- splitString :: String -> [Float]
+-- splitString "" = []
+-- splitString str = 
+--     let (x, xs_w_splitter) = break (==',') str
+--         (_, xs) = span (==',') xs_w_splitter
+--      in read x : splitString xs
 
+splitOnString  :: String -> [Float]
+splitOnString  "" = []
+splitOnString  xs = read (takeWhile (/= ',') xs) : splitOnString (drop 1 (dropWhile (/= ',') xs))
+
+
+
+--Prochází pustupně jednotlivé řádky floatů (1 řádek -> nové dato pro kterou se určuje tříada)
 prochazejData ::  Tree -> [[Float]] -> [String]
 prochazejData _ [] = []
 prochazejData tree (f:fs) = findInTree tree f : prochazejData tree fs
 
+--Funkce dostane strom (nazačátku tam bude  první node) a jeden řádek s floaty pro vyhodnocení, dokud nenarazí na leaf tak prochází podstromy a porovnávaá
 findInTree :: Tree -> [Float] -> String
--- findInTree tree floats =
---  case getNodeIndex tree of
---         Just index -> "Index nalezen: " ++ show index
---         Nothing -> "Index nenalezen"
-findInTree tree floats = "asda"
+findInTree (Leaf trida) _ = trida
+findInTree (Node i value l r) floats
+  | getValueForComparsion i floats <= value =  findInTree l floats
+  | otherwise = findInTree r floats
 
-getNodeValue :: Tree -> Maybe Double
-getNodeValue (Node _ nodeValue _ _) = Just nodeValue
-getNodeValue(Leaf _) = Nothing
+--Získá správný float pro porovnávání s hodnotou nodu
+getValueForComparsion :: Int -> [Float] -> Float 
+getValueForComparsion 0 (x:xs) = x
+getValueForComparsion index (x:xs) = getValueForComparsion (index-1) xs
 
-getNodeIndex :: Tree -> Maybe Int
-getNodeIndex (Node index _ _ _) = Just index
-getNodeIndex (Leaf _) =  Nothing
+-- printClasses :: [String] -> IO
+-- printClasses (x:xs)
 
-getLeafClass:: Tree -> String
-getLeafClass (Leaf trida) = trida
+
 
 
 main :: IO()
@@ -132,8 +135,7 @@ main = do
        let res = fileStringToFloats (lines file2_content)
        print res
 
-       let res2 = prochazejData file1_content res
-       print res2
+       putStr .  unlines $ prochazejData file1_content res
        
     else do
         putStr "Chyba pri spousteni projektu! Jedine mozne formy jsou: \n flp-fun -1 <soubor obsahujici strom> <soubor obsahujici nove data> \n flp-fun -2 <soubor obsahujici trenovaci data> "
