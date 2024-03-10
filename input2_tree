@@ -1,0 +1,13 @@
+Node: 0, 5.5
+  Node: 1, 3.0
+    Leaf: TřídaA
+    Node: 0, 4.0
+      Leaf: TřídaB
+      Leaf: TřídaC
+  Node: 2, 10.0
+    Leaf: TřídaD
+    Node: 1, 20.0
+      Node: 2, 15.0
+        Leaf: TřídaE
+        Leaf: TřídaF
+      Leaf: TřídaG

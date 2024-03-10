@@ -2,9 +2,9 @@ GHCC = ghc
 
 FLAGS = -Wall
 
-SRC = src/Main.hs
+SRC = tree.hs
 
-OUT = flp-fun
+OUT = tree
 
 all: $(OUT)	
 

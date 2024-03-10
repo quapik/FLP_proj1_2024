@@ -1,18 +1,19 @@
 --Vojtěch Šíma, xsimav01, 2024
 -- FLP Funkcionalni projekt
 import System.Environment (getArgs)
-import System.IO (openFile, hGetContents, hSetEncoding, hClose, IOMode (ReadMode))
+import System.IO (openFile, hGetContents, hSetEncoding, IOMode (ReadMode))
 import Text.Parsec
     ((<|>), anyChar, oneOf,try, alphaNum, space, newline, manyTill, char, digit, spaces, string, many1, sepEndBy, endBy, parse, many, noneOf)
 import Text.Parsec.String (Parser)
-import Control.Monad (replicateM)
+import Control.Monad (replicateM_)
 import Text.Parsec.Combinator(eof)
-import GHC.IO.Encoding (getLocaleEncoding, utf8)
+import GHC.IO.Encoding (utf8)
+
 
 
 --Kontrola správně zadaných argumentů, pouze dvě možnosti, jinak chyba
 argsChecker ::  [String] -> Bool
-argsChecker [x,_] = x == "-2" 
+argsChecker [x,_] = x == "-2"
 argsChecker [x,_,_] = x == "-1"
 argsChecker _  = False
 
@@ -20,17 +21,18 @@ argsChecker _  = False
 fileExtract :: [String] -> (String, String)
 fileExtract [_, file] = (file, "")
 fileExtract [_, file1, file2] = (file1,file2)
-fileExtract [_] = ("", "")
+fileExtract _ = ("", "")
 
 data Tree = Leaf String | Node Int Float Tree Tree deriving Show
 ------------------------------------SOUBOR SE STROMEM
+
 --Přečtení souboru se stromem a spuštění jeho parseru. Pokud uspěje, vrátí se načtený strom, jinak chyba
 readTreeInputAndParse :: FilePath -> IO Tree --co tu ten IO?
 readTreeInputAndParse inputFile =
   --Open file místo read kvůli tomu aby se vpohodě načítala diakritika a dalo se s ní pracovat
-  openFile inputFile ReadMode >>= 
+  openFile inputFile ReadMode >>=
   \fileHandle -> hSetEncoding fileHandle utf8 >>
-  hGetContents fileHandle >>= 
+  hGetContents fileHandle >>=
   \input -> case parse (nodeParser 0)  "" input of
     Left err -> error $  "Chyba pri nacitani vstupniho soboru se stromem: " ++ show err --TODO ERROR HANDLER
     Right loadedTree -> return loadedTree
@@ -41,42 +43,38 @@ tryParsers pocet_mezer =  try (leafParser $ pocet_mezer + 2)  <|> try (leafParse
 
 --Zkontroluje odsazení, najde klíčové slovo Leaf:  a načte třídu pro daný Leaf
 leafParser :: Int -> Parser Tree
-leafParser pocet_mezer = do
-  odsazeni <- replicateM pocet_mezer space
-  string "Leaf: "
-  trida <-  manyTill anyChar newline
-  return (Leaf trida)
+leafParser pocet_mezer =
+  replicateM_ pocet_mezer space >>
+  string "Leaf: " >>
+  fmap Leaf (manyTill anyChar (string "\n" <|> string "\r\n"))--kvuli linux/win newlinum
 
 --Stejná funkce, ale pro pripad ze tam je eof -> krkolomné, ale nepodařilo se mi zkombinovat newline <|> eof v jedne funkci
 leafParserEOF :: Int -> Parser Tree
-leafParserEOF pocet_mezer = do
-  odsazeni <- replicateM pocet_mezer space
-  string "Leaf: "
-  trida <-  manyTill anyChar eof
-  return (Leaf trida)
+leafParserEOF pocet_mezer =
+  replicateM_ pocet_mezer space >>
+  string "Leaf: " >>
+  fmap Leaf (manyTill anyChar eof)
 
 --Zkontroluje odsazení, najde klíčové slovo Node: , načte index příznaku a pak celou a desetinou část prahu (aby šlo na float)
 nodeParser :: Int -> Parser Tree
 nodeParser pocet_mezer = do
-  odsazeni <- replicateM pocet_mezer space
+  odsazeni <- replicateM_ pocet_mezer space
   string "Node: "
   index_priznaku <- many1 digit
   string ", "
   prah_cela <- many1 digit
   char '.'
-  prah_desetinna <- manyTill digit newline 
+  prah_desetinna <- manyTill digit (string "\n" <|> string "\r\n") --kvuli linux/win newlinum
   l <- tryParsers pocet_mezer
-   --spaces
-  --char '\n'
   r <- tryParsers pocet_mezer
-  return (Node (read index_priznaku) (read (prah_cela ++ "." ++ prah_desetinna)) l r) 
+  return (Node (read index_priznaku) (read (prah_cela ++ "." ++ prah_desetinna)) l r)
 
 
 --SKOPIROVANY, ODSTRAN!
 printTree :: Tree -> String
 printTree (Leaf label) = "Leaf: " ++ label ++ "\n"
-printTree (Node id threshold left right) =
-  "Node: " ++ show id ++ ", " ++ show threshold ++ "\n" ++
+printTree (Node index prah left right) =
+  "Node: " ++ show index ++ ", " ++ show prah ++ "\n" ++
   printTree left ++
   printTree right
 
@@ -86,19 +84,9 @@ fileStringToFloats :: [String] -> [[Float]]
 fileStringToFloats [] = []
 fileStringToFloats (x:xs)  = splitOnString x : fileStringToFloats xs
 
--- Funkce, co dostane string, oddělí první substring před čárkou, ten převede na float, zbatek zbaví té čárky a rekurzivně volá
--- splitString :: String -> [Float]
--- splitString "" = []
--- splitString str = 
---     let (x, xs_w_splitter) = break (==',') str
---         (_, xs) = span (==',') xs_w_splitter
---      in read x : splitString xs
-
 splitOnString  :: String -> [Float]
 splitOnString  "" = []
 splitOnString  xs = read (takeWhile (/= ',') xs) : splitOnString (drop 1 (dropWhile (/= ',') xs))
-
-
 
 --Prochází pustupně jednotlivé řádky floatů (1 řádek -> nové dato pro kterou se určuje tříada)
 prochazejData ::  Tree -> [[Float]] -> [String]
@@ -113,30 +101,50 @@ findInTree (Node i value l r) floats
   | otherwise = findInTree r floats
 
 --Získá správný float pro porovnávání s hodnotou nodu
-getValueForComparsion :: Int -> [Float] -> Float 
-getValueForComparsion 0 (x:xs) = x
-getValueForComparsion index (x:xs) = getValueForComparsion (index-1) xs
+getValueForComparsion :: Int -> [Float] -> Float
+getValueForComparsion 0 (x:_) = x
+getValueForComparsion index (_:xs) = getValueForComparsion (index-1) xs
 
--- printClasses :: [String] -> IO
--- printClasses (x:xs)
+printMSG :: String -> IO ()
+printMSG = putStr
 
+------------------------------------ DRUHY PODUKOL
+data TrenovaciData = TrenovaciData{floats :: [Float], trida :: String} deriving Show
 
+extractData :: [String] -> [TrenovaciData]
+extractData [] = []
+extractData (x:xs) = splitFloatsAndClass x : extractData xs
 
+--Funkce vezme jeden řádek a ten převádí na TrenovaciData, převede [String] -> [Float] pro všechny krom posledního a s poslením uloží do struktury
+splitFloatsAndClass :: String -> TrenovaciData
+splitFloatsAndClass str = TrenovaciData (map read $ init $ splitOnStringToString str) (last $ splitOnStringToString str)
+
+--Funkce co rozdělí string do pole stiringů podle čárky
+splitOnStringToString  :: String -> [String]
+splitOnStringToString  "" = []
+splitOnStringToString  xs = takeWhile (/= ',') xs : splitOnStringToString (drop 1 (dropWhile (/= ',') xs))
+
+printTrenovaciData:: TrenovaciData -> IO ()
+printTrenovaciData trenovacidata = do
+  print (floats trenovacidata)
+  putStrLn (trida trenovacidata)
 
 main :: IO()
 main = do
     args <- getArgs
     if argsChecker args then  do
-       let (file1, file2) = fileExtract args
-       file1_content <- readTreeInputAndParse file1
-       putStr (printTree file1_content)
+      if snd  (fileExtract args) == "" then do
+       file2_content <- readFile (fst $ fileExtract args)
+       let dataRecords = extractData (lines file2_content)
+       mapM_ printTrenovaciData dataRecords
+      else do
+       file1_content <- readTreeInputAndParse (fst $ fileExtract args)
+       --putStr (printTree file1_content)
+       file2_content <- readFile (snd $ fileExtract args)
+       --print res
+       --Print tříd pro 
+       putStr .  unlines $ prochazejData file1_content $ fileStringToFloats (lines file2_content)
 
-       file2_content <- readFile file2
-       let res = fileStringToFloats (lines file2_content)
-       print res
-
-       putStr .  unlines $ prochazejData file1_content res
-       
     else do
         putStr "Chyba pri spousteni projektu! Jedine mozne formy jsou: \n flp-fun -1 <soubor obsahujici strom> <soubor obsahujici nove data> \n flp-fun -2 <soubor obsahujici trenovaci data> "
     return ()
