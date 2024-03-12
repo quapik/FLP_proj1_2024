@@ -14,6 +14,7 @@ import Distribution.Simple (UserHooks(postClean))
 import GHC.RTS.Flags (TraceFlags(traceNonmovingGc))
 import Control.Concurrent.STM (check)
 import System.Win32 (xBUTTON1)
+import Data.ByteString.Builder (FloatFormat)
 
 --Kontrola správně zadaných argumentů, pouze dvě možnosti, jinak chyba
 argsChecker ::  [String] -> Bool
@@ -68,20 +69,19 @@ nodeParser pocet_mezer = do
   prah_cela <- many1 digit
   char '.'
   prah_desetinna <- manyTill digit (string "\n" <|> string "\r\n") --kvuli linux/win newlinum
-  l <- tryParsers pocet_mezer 
+  l <- tryParsers pocet_mezer
   r <- tryParsers pocet_mezer
   return (Node (read index_priznaku) (read (prah_cela ++ "." ++ prah_desetinna)) l r)
 
 
-printTree :: Tree -> Int -> IO () 
-printTree (Leaf trida) odsazeni = putStrLn(replicate odsazeni ' ' ++ "Leaf: " ++ trida) 
-printTree (Node i value l r) odsazeni = putStrLn(replicate odsazeni ' ' ++ "Node: " ++ show i ++ ", " ++ show value) >> printTree l (odsazeni + 2) >> printTree r (odsazeni + 2)
-  
+printTree :: Tree -> Int -> IO ()
+printTree (Leaf trida) odsazeni = putStrLn (replicate odsazeni ' ' ++ "Leaf: " ++ trida)
+printTree (Node i value l r) odsazeni = putStrLn (replicate odsazeni ' ' ++ "Node: " ++ show i ++ ", " ++ show value) >> printTree l (odsazeni + 2) >> printTree r (odsazeni + 2)
+
 ------------------------------------SOUBOR s FLOATAMA
 --Funkce dostane načtený soubor rozdělený do listu podle řádků a vrací list listů floatů s jednotlivými body
 fileStringToFloats :: [String] -> [[Float]]
-fileStringToFloats [] = []
-fileStringToFloats (x:xs)  = splitOnString x : fileStringToFloats xs
+fileStringToFloats xs = map splitOnString xs
 
 splitOnString  :: String -> [Float]
 splitOnString  "" = []
@@ -106,8 +106,7 @@ getValueForComparsion index (_:xs) = getValueForComparsion (index-1) xs
 
 ------------------------------------ DRUHY PODUKOL
 extractData :: [String] -> [TrenovaciData]
-extractData [] = []
-extractData (x:xs) = splitFloatsAndClass x : extractData xs
+extractData xs = map splitFloatsAndClass xs
 
 --Funkce vezme jeden řádek a ten převádí na TrenovaciData, převede [String] -> [Float] pro všechny krom posledního a s poslením uloží do struktury
 splitFloatsAndClass :: String -> TrenovaciData
@@ -125,7 +124,7 @@ vypocitejNejmensi :: [TrenovaciData] -> Tree
 vypocitejNejmensi trenovaciDataList
  | length trenovaciDataList == 1 = Leaf (trida (head trenovaciDataList))
  | otherwise = Node nejmensi_index (prumery trenovaciDataList !! nejmensi_index) (vypocitejNejmensi l) (vypocitejNejmensi r)
-     where vypocitane_splity =  zipWith (\index prumer -> checkGiniSplit trenovaciDataList prumer index) [0..] (prumery trenovaciDataList)
+     where vypocitane_splity =  zipWith (flip (checkGiniSplit trenovaciDataList)) [0..] (prumery trenovaciDataList)
            nejmensi_index = findElemIndex (minimum vypocitane_splity) vypocitane_splity (length vypocitane_splity)
            l = fst (splitTrenovaciData trenovaciDataList (prumery trenovaciDataList !! nejmensi_index) nejmensi_index)
            r = snd (splitTrenovaciData trenovaciDataList (prumery trenovaciDataList !! nejmensi_index) nejmensi_index)
@@ -141,9 +140,29 @@ findElemIndex elem (x:xs) delka = if x == elem then delka - length xs -1 else fi
 prumery :: [TrenovaciData] -> [Float]
 prumery  trenovaciDataList  = map (\x -> sum x / fromIntegral (length x)) (transpose $ map floats trenovaciDataList)
 
+createIntervals::  [TrenovaciData] -> [[Float]]
+createIntervals trenovaciDataList = zipWith (\min max -> [min, (min + 0.1) .. max]) minValues maxValues
+  where minValues = map minimum (transpose (map floats trenovaciDataList))
+        maxValues = map maximum (transpose (map floats trenovaciDataList))
+
+-- minimazeIntervals :: [TrenovaciData] -> [[Float]] -> [Float]
+-- minimazeIntervals trenovaciDataList intervals = map (minimum . calculateGiniSplits) (transpose intervals)
+--   where calculateGiniSplits column = zipWith (\prumer index -> checkGiniSplit trenovaciDataList prumer index) column [0..]
+
+
+minimizeIntervals :: [TrenovaciData] -> [[Float]] -> [(Float,Int)]
+minimizeIntervals trenovaciDataList intervals =  zipWith (findMinInInterval trenovaciDataList) intervals [0..]
+
+findMinInInterval :: [TrenovaciData] -> [Float] -> Int -> (Float,Int)
+findMinInInterval trenovaciDataList interval index = (minimum [checkGiniSplit trenovaciDataList prah index | prah <- interval] , findElemIndex min [checkGiniSplit trenovaciDataList prah index | prah <- interval] (length interval))
+  where min = minimum [checkGiniSplit trenovaciDataList prah index | prah <- interval]
+findMinInIntervalIndex :: [TrenovaciData] -> [Float] -> Int -> Int
+findMinInIntervalIndex trenovaciDataList interval index = findElemIndex min [checkGiniSplit trenovaciDataList prah index | prah <- interval] (length interval)
+  where min = minimum [checkGiniSplit trenovaciDataList prah index | prah <- interval]
+
 --Funkce vypočítá GiniSplit hodnotu - podle prahu rozdělí na dvě část, vypočítá GiniLeft a GiniRight 
 checkGiniSplit :: [TrenovaciData] -> Float -> Int -> Float
-checkGiniSplit trenovaciDataList prah index = (fromIntegral (length prvni) / fromIntegral (length trenovaciDataList)) * giniLeftRight prvni + (fromIntegral (length druhy) / fromIntegral (length trenovaciDataList)) * giniLeftRight druhy
+checkGiniSplit trenovaciDataList prah index = fromIntegral (length prvni) / fromIntegral (length trenovaciDataList) * giniLeftRight prvni + fromIntegral (length druhy) / fromIntegral (length trenovaciDataList) * giniLeftRight druhy
   where prvni = fst (splitTrenovaciData trenovaciDataList prah index)
         druhy = snd (splitTrenovaciData trenovaciDataList prah index)
 
@@ -155,7 +174,7 @@ giniLeftRight trenovaciDataList =
 
 --Rozdělí trenovací data na 2 skupiny podle toho, jestli jsou hodnoty indexu na daném řádku větší/menší než práh
 splitTrenovaciData :: [TrenovaciData] -> Float -> Int -> ([TrenovaciData],[TrenovaciData])
-splitTrenovaciData trenovaciDataList prah index = partition (\x -> (floats x !! index) <= prah) trenovaciDataList
+splitTrenovaciData trenovaciDataList prah index = partition (\x -> floats x !! index <= prah) trenovaciDataList
 
 printTrenovaciData:: TrenovaciData -> IO ()
 printTrenovaciData trenovacidata = do
@@ -173,9 +192,13 @@ main = do
        --putStrLn $ "Průměrné hodnoty pro všechny položky: " ++ show (prumernaHodnota nactenaTrenovaciData)
        --let (x,y) = splitTrenovaciData nactenaTrenovaciData 4.16 
        --mapM_ printTrenovaciData  x
-       let x = vypocitejNejmensi nactenaTrenovaciData
-       printTree x 0
-       
+      --  let x = vypocitejNejmensi nactenaTrenovaciData
+      --  printTree x 0
+       let y = createIntervals nactenaTrenovaciData
+       print y
+       let a = minimizeIntervals nactenaTrenovaciData y
+       print a
+
       else do
        file1_content <- readTreeInputAndParse (fst $ fileExtract args)
        --putStr (printTree file1_content)
@@ -184,6 +207,5 @@ main = do
        --Print tříd pro 
        putStr .  unlines $ prochazejData file1_content $ fileStringToFloats (lines file2_content)
 
-    else do
-        putStr "Chyba pri spousteni projektu! Jedine mozne formy jsou: \n flp-fun -1 <soubor obsahujici strom> <soubor obsahujici nove data> \n flp-fun -2 <soubor obsahujici trenovaci data> "
+    else putStr "Chyba pri spousteni projektu! Jedine mozne formy jsou: \n flp-fun -1 <soubor obsahujici strom> <soubor obsahujici nove data> \n flp-fun -2 <soubor obsahujici trenovaci data> "
     return ()
