@@ -8,8 +8,12 @@ import Text.Parsec.String (Parser)
 import Control.Monad (replicateM_)
 import Text.Parsec.Combinator(eof)
 import GHC.IO.Encoding (utf8)
-
-
+import Data.List (group, sort, partition,transpose,elemIndex)
+import Debug.Trace
+import Distribution.Simple (UserHooks(postClean))
+import GHC.RTS.Flags (TraceFlags(traceNonmovingGc))
+import Control.Concurrent.STM (check)
+import System.Win32 (xBUTTON1)
 
 --Kontrola správně zadaných argumentů, pouze dvě možnosti, jinak chyba
 argsChecker ::  [String] -> Bool
@@ -23,7 +27,6 @@ fileExtract [_, file] = (file, "")
 fileExtract [_, file1, file2] = (file1,file2)
 fileExtract _ = ("", "")
 
-data Tree = Leaf String | Node Int Float Tree Tree deriving Show
 ------------------------------------SOUBOR SE STROMEM
 
 --Přečtení souboru se stromem a spuštění jeho parseru. Pokud uspěje, vrátí se načtený strom, jinak chyba
@@ -65,19 +68,15 @@ nodeParser pocet_mezer = do
   prah_cela <- many1 digit
   char '.'
   prah_desetinna <- manyTill digit (string "\n" <|> string "\r\n") --kvuli linux/win newlinum
-  l <- tryParsers pocet_mezer
+  l <- tryParsers pocet_mezer 
   r <- tryParsers pocet_mezer
   return (Node (read index_priznaku) (read (prah_cela ++ "." ++ prah_desetinna)) l r)
 
 
---SKOPIROVANY, ODSTRAN!
-printTree :: Tree -> String
-printTree (Leaf label) = "Leaf: " ++ label ++ "\n"
-printTree (Node index prah left right) =
-  "Node: " ++ show index ++ ", " ++ show prah ++ "\n" ++
-  printTree left ++
-  printTree right
-
+printTree :: Tree -> Int -> IO () 
+printTree (Leaf trida) odsazeni = putStrLn(replicate odsazeni ' ' ++ "Leaf: " ++ trida) 
+printTree (Node i value l r) odsazeni = putStrLn(replicate odsazeni ' ' ++ "Node: " ++ show i ++ ", " ++ show value) >> printTree l (odsazeni + 2) >> printTree r (odsazeni + 2)
+  
 ------------------------------------SOUBOR s FLOATAMA
 --Funkce dostane načtený soubor rozdělený do listu podle řádků a vrací list listů floatů s jednotlivými body
 fileStringToFloats :: [String] -> [[Float]]
@@ -105,12 +104,7 @@ getValueForComparsion :: Int -> [Float] -> Float
 getValueForComparsion 0 (x:_) = x
 getValueForComparsion index (_:xs) = getValueForComparsion (index-1) xs
 
-printMSG :: String -> IO ()
-printMSG = putStr
-
 ------------------------------------ DRUHY PODUKOL
-data TrenovaciData = TrenovaciData{floats :: [Float], trida :: String} deriving Show
-
 extractData :: [String] -> [TrenovaciData]
 extractData [] = []
 extractData (x:xs) = splitFloatsAndClass x : extractData xs
@@ -124,6 +118,45 @@ splitOnStringToString  :: String -> [String]
 splitOnStringToString  "" = []
 splitOnStringToString  xs = takeWhile (/= ',') xs : splitOnStringToString (drop 1 (dropWhile (/= ',') xs))
 
+data TrenovaciData = TrenovaciData{floats :: [Float], trida :: String} deriving Show
+data Tree = Leaf String | Node Int Float Tree Tree deriving Show
+
+vypocitejNejmensi :: [TrenovaciData] -> Tree
+vypocitejNejmensi trenovaciDataList
+ | length trenovaciDataList == 1 = Leaf (trida (head trenovaciDataList))
+ | otherwise = Node nejmensi_index (prumery trenovaciDataList !! nejmensi_index) (vypocitejNejmensi l) (vypocitejNejmensi r)
+     where vypocitane_splity =  zipWith (\index prumer -> checkGiniSplit trenovaciDataList prumer index) [0..] (prumery trenovaciDataList)
+           nejmensi_index = findElemIndex (minimum vypocitane_splity) vypocitane_splity (length vypocitane_splity)
+           l = fst (splitTrenovaciData trenovaciDataList (prumery trenovaciDataList !! nejmensi_index) nejmensi_index)
+           r = snd (splitTrenovaciData trenovaciDataList (prumery trenovaciDataList !! nejmensi_index) nejmensi_index)
+
+
+-- vypocitejNejmensi trenovaciDataList = splitTrenovaciData trenovaciDataList (prumery trenovaciDataList !! nejmensi_index) nejmensi_index
+--   where vypocitane_splity =  zipWith (\index prumer -> checkGiniSplit trenovaciDataList prumer index) [0..] (prumery trenovaciDataList)
+--         nejmensi_index = findElemIndex (minimum vypocitane_splity) vypocitane_splity (length vypocitane_splity)
+
+findElemIndex :: Float -> [Float]  -> Int -> Int
+findElemIndex elem (x:xs) delka = if x == elem then delka - length xs -1 else findElemIndex elem xs delka
+
+prumery :: [TrenovaciData] -> [Float]
+prumery  trenovaciDataList  = map (\x -> sum x / fromIntegral (length x)) (transpose $ map floats trenovaciDataList)
+
+--Funkce vypočítá GiniSplit hodnotu - podle prahu rozdělí na dvě část, vypočítá GiniLeft a GiniRight 
+checkGiniSplit :: [TrenovaciData] -> Float -> Int -> Float
+checkGiniSplit trenovaciDataList prah index = (fromIntegral (length prvni) / fromIntegral (length trenovaciDataList)) * giniLeftRight prvni + (fromIntegral (length druhy) / fromIntegral (length trenovaciDataList)) * giniLeftRight druhy
+  where prvni = fst (splitTrenovaciData trenovaciDataList prah index)
+        druhy = snd (splitTrenovaciData trenovaciDataList prah index)
+
+giniLeftRight :: [TrenovaciData] ->  Float
+giniLeftRight trenovaciDataList =
+  let pocty_trid = map length $ group $ sort $ map trida trenovaciDataList -- pocet jednotlivych trid [A,C,B,A,C,C] -> [A,A,B,C,C,C] -> [AA,B,CCC]-> [2,1,3]
+      zlomky = map (\x -> (fromIntegral x / fromIntegral (length trenovaciDataList))^2) pocty_trid --(pocty_trid/celkem_trid)^2 -> pravdepodobnost vyskytu dane tridy
+  in 1.0 - sum zlomky
+
+--Rozdělí trenovací data na 2 skupiny podle toho, jestli jsou hodnoty indexu na daném řádku větší/menší než práh
+splitTrenovaciData :: [TrenovaciData] -> Float -> Int -> ([TrenovaciData],[TrenovaciData])
+splitTrenovaciData trenovaciDataList prah index = partition (\x -> (floats x !! index) <= prah) trenovaciDataList
+
 printTrenovaciData:: TrenovaciData -> IO ()
 printTrenovaciData trenovacidata = do
   print (floats trenovacidata)
@@ -135,8 +168,14 @@ main = do
     if argsChecker args then  do
       if snd  (fileExtract args) == "" then do
        file2_content <- readFile (fst $ fileExtract args)
-       let dataRecords = extractData (lines file2_content)
-       mapM_ printTrenovaciData dataRecords
+       let nactenaTrenovaciData = extractData (lines file2_content)
+       --mapM_ printTrenovaciData  nactenaTrenovaciData
+       --putStrLn $ "Průměrné hodnoty pro všechny položky: " ++ show (prumernaHodnota nactenaTrenovaciData)
+       --let (x,y) = splitTrenovaciData nactenaTrenovaciData 4.16 
+       --mapM_ printTrenovaciData  x
+       let x = vypocitejNejmensi nactenaTrenovaciData
+       printTree x 0
+       
       else do
        file1_content <- readTreeInputAndParse (fst $ fileExtract args)
        --putStr (printTree file1_content)
