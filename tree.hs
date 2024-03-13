@@ -9,12 +9,6 @@ import Control.Monad (replicateM_)
 import Text.Parsec.Combinator(eof)
 import GHC.IO.Encoding (utf8)
 import Data.List (group, sort, partition,transpose,elemIndex)
-import Debug.Trace
-import Distribution.Simple (UserHooks(postClean))
-import GHC.RTS.Flags (TraceFlags(traceNonmovingGc))
-import Control.Concurrent.STM (check)
-import System.Win32 (xBUTTON1)
-import Data.ByteString.Builder (FloatFormat)
 
 --Kontrola správně zadaných argumentů, pouze dvě možnosti, jinak chyba
 argsChecker ::  [String] -> Bool
@@ -81,7 +75,7 @@ printTree (Node i value l r) odsazeni = putStrLn (replicate odsazeni ' ' ++ "Nod
 ------------------------------------SOUBOR s FLOATAMA
 --Funkce dostane načtený soubor rozdělený do listu podle řádků a vrací list listů floatů s jednotlivými body
 fileStringToFloats :: [String] -> [[Float]]
-fileStringToFloats xs = map splitOnString xs
+fileStringToFloats = map splitOnString
 
 splitOnString  :: String -> [Float]
 splitOnString  "" = []
@@ -106,7 +100,7 @@ getValueForComparsion index (_:xs) = getValueForComparsion (index-1) xs
 
 ------------------------------------ DRUHY PODUKOL
 extractData :: [String] -> [TrenovaciData]
-extractData xs = map splitFloatsAndClass xs
+extractData = map splitFloatsAndClass
 
 --Funkce vezme jeden řádek a ten převádí na TrenovaciData, převede [String] -> [Float] pro všechny krom posledního a s poslením uloží do struktury
 splitFloatsAndClass :: String -> TrenovaciData
@@ -121,25 +115,21 @@ data TrenovaciData = TrenovaciData{floats :: [Float], trida :: String} deriving 
 data Tree = Leaf String | Node Int Float Tree Tree deriving Show
 
 --Funkce, co dostane trénovací data a postupně rekurzivně volá rozdělovací funkce a tvoří strom
+--Pokud jeden prvek, automaticky leaf, pokud 2 a jsou stejné, tak už není co dělit a je to automaticky ta daná třída
 vytvarejStrom :: [TrenovaciData] -> Tree
 vytvarejStrom trenovaciDataList
  | length trenovaciDataList == 1 = Leaf (trida (head trenovaciDataList))
+ | length trenovaciDataList == 2, trida (head trenovaciDataList) == trida (last trenovaciDataList) = Leaf (trida (head trenovaciDataList))
  | otherwise = Node nejmensi_index prah (vytvarejStrom l) (vytvarejStrom r)
-     where --vypocitane_splity =  zipWith (flip (checkGiniSplit trenovaciDataList)) [0..] (prumery trenovaciDataList)
-           --nejmensi_index = findElemIndex (minimum vypocitane_splity) vypocitane_splity (length vypocitane_splity)
-           intervals =  createIntervals trenovaciDataList
+     where intervals =  createIntervals trenovaciDataList
            nejmensi_index = fst (minimizeIntervals trenovaciDataList intervals)
-           prah  = (intervals !! nejmensi_index) !! snd (minimizeIntervals trenovaciDataList intervals)
+           prah  = intervals !! nejmensi_index !! snd (minimizeIntervals trenovaciDataList intervals)
            l = fst (splitTrenovaciData trenovaciDataList  prah nejmensi_index)
            r = snd (splitTrenovaciData trenovaciDataList  prah nejmensi_index)
-
 
 --Vlastní funkce, co vrací index prvku v poli (vždy tam ten prvek bude, tudíž nemusí být Maybe a je to jednodušší na použití)
 findElemIndex :: Float -> [Float]  -> Int -> Int
 findElemIndex elem (x:xs) delka = if x == elem then delka - length xs -1 else findElemIndex elem xs delka
-
--- prumery :: [TrenovaciData] -> [Float]
--- prumery  trenovaciDataList  = map (\x -> sum x / fromIntegral (length x)) (transpose $ map floats trenovaciDataList)
 
 --Funkce vezme pro jednotlivé float (slupce na indexech) minimum a maximum a z toho vytvoří po desetinách itnerval
 createIntervals::  [TrenovaciData] -> [[Float]]
@@ -147,30 +137,24 @@ createIntervals trenovaciDataList = zipWith (\min max -> [min, (min + 0.1) .. ma
   where minValues = map minimum (transpose (map floats trenovaciDataList))
         maxValues = map maximum (transpose (map floats trenovaciDataList))
 
-
 --Funkce vezme data, intervaly a vyplivne pouze to, kde se nachází nejmenší Gsplit hodnota co se použije jako práh (index_intervalu, index_v_intervalu)
 minimizeIntervals :: [TrenovaciData] -> [[Float]] -> (Int,Int)
 minimizeIntervals trenovaciDataList intervals = (index_sloupce, index_v_intervalu)
-  where nejmensi_splity = fst (unzip (zipWith (findMinInInterval trenovaciDataList) intervals [0..]))
-        nejmensi_indexy = snd (unzip (zipWith (findMinInInterval trenovaciDataList) intervals [0..]))
+  where nejmensi_splity = map fst (zipWith (findMinInInterval trenovaciDataList) intervals [0..])
+        nejmensi_indexy = map snd (zipWith (findMinInInterval trenovaciDataList) intervals [0..])
         index_sloupce = findElemIndex (minimum nejmensi_splity) nejmensi_splity (length nejmensi_splity)
-        index_v_intervalu = nejmensi_indexy !! index_sloupce 
-        
+        index_v_intervalu = nejmensi_indexy !! index_sloupce
+
 --Funkce volá zkoušení splitů a co najde minimum v intervalu a to, na jaké se nachází pozici 
 findMinInInterval :: [TrenovaciData] -> [Float] -> Int -> (Float,Int)
 findMinInInterval trenovaciDataList interval index = (minimum [checkGiniSplit trenovaciDataList prah index | prah <- interval] , findElemIndex min [checkGiniSplit trenovaciDataList prah index | prah <- interval] (length interval))
   where min = minimum [checkGiniSplit trenovaciDataList prah index | prah <- interval]
-
--- findMinInIntervalIndex :: [TrenovaciData] -> [Float] -> Int -> Int
--- findMinInIntervalIndex trenovaciDataList interval index = findElemIndex min [checkGiniSplit trenovaciDataList prah index | prah <- interval] (length interval)
---   where min = minimum [checkGiniSplit trenovaciDataList prah index | prah <- interval]
 
 --Funkce vypočítá GiniSplit hodnotu - podle prahu rozdělí na dvě část, vypočítá GiniLeft a GiniRight 
 checkGiniSplit :: [TrenovaciData] -> Float -> Int -> Float
 checkGiniSplit trenovaciDataList prah index = fromIntegral (length prvni) / fromIntegral (length trenovaciDataList) * giniLeftRight prvni + fromIntegral (length druhy) / fromIntegral (length trenovaciDataList) * giniLeftRight druhy
   where prvni = fst (splitTrenovaciData trenovaciDataList prah index)
         druhy = snd (splitTrenovaciData trenovaciDataList prah index)
-
 
 -- Výpočet GiniLeft\GiniRight hodnot, kter=é se použijí výše ve splitu 1 - suma pravdepodobnosti^2
 giniLeftRight :: [TrenovaciData] ->  Float
@@ -194,17 +178,8 @@ main = do
       if snd  (fileExtract args) == "" then do
        file2_content <- readFile (fst $ fileExtract args)
        let nactenaTrenovaciData = extractData (lines file2_content)
-       --mapM_ printTrenovaciData  nactenaTrenovaciData
-       --putStrLn $ "Průměrné hodnoty pro všechny položky: " ++ show (prumernaHodnota nactenaTrenovaciData)
-       --let (x,y) = splitTrenovaciData nactenaTrenovaciData 4.16 
-       --mapM_ printTrenovaciData  x
        let x = vytvarejStrom nactenaTrenovaciData
        printTree x 0
-       let y = createIntervals nactenaTrenovaciData
-       print y
-      --  let a = minimizeIntervals nactenaTrenovaciData y
-      --  print a
-
       else do
        file1_content <- readTreeInputAndParse (fst $ fileExtract args)
        --putStr (printTree file1_content)
