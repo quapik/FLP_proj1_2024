@@ -2,14 +2,19 @@
 -- FLP Funkcionalni projekt
 import System.Environment (getArgs)
 import System.IO (openFile, hGetContents, hSetEncoding, IOMode (ReadMode))
-import Text.Parsec
-    ((<|>), anyChar, oneOf,try, alphaNum, space, newline, manyTill, char, digit, spaces, string, many1, sepEndBy, endBy, parse, many, noneOf)
+import Text.Parsec ((<|>), anyChar, oneOf,try, alphaNum, space, newline, manyTill, char, digit, spaces, string, many1, sepEndBy, endBy, parse, many, noneOf)
 import Text.Parsec.String (Parser)
 import Control.Monad (replicateM_)
 import Text.Parsec.Combinator(eof)
 import GHC.IO.Encoding (utf8)
 import Data.List (group, sort, partition,transpose,elemIndex)
+import System.Exit (exitFailure)
 
+--Pužívané datové typy
+data TrenovaciData = TrenovaciData{floats :: [Float], trida :: String} deriving Show
+data Tree = Leaf String | Node Int Float Tree Tree deriving Show
+
+------------------------------------ARGUMENTY
 --Kontrola správně zadaných argumentů, pouze dvě možnosti, jinak chyba
 argsChecker ::  [String] -> Bool
 argsChecker [x,_] = x == "-2"
@@ -22,13 +27,14 @@ fileExtract [_, file] = (file, "")
 fileExtract [_, file1, file2] = (file1,file2)
 fileExtract _ = ("", "")
 
-------------------------------------SOUBOR SE STROMEM
+handleError :: String -> IO ()
+handleError error_msg = putStrLn ("Nekde se vystkytla chyba!\n" ++ error_msg) >> exitFailure
 
+------------------------------------NAČÍTÁNÍ PRVNÍHO SOUBORU A JEHO PARSOVÁNÍ
 --Přečtení souboru se stromem a spuštění jeho parseru. Pokud uspěje, vrátí se načtený strom, jinak chyba
 readTreeInputAndParse :: FilePath -> IO Tree --co tu ten IO?
 readTreeInputAndParse inputFile =
-  --Open file místo read kvůli tomu aby se vpohodě načítala diakritika a dalo se s ní pracovat
-  openFile inputFile ReadMode >>=
+  openFile inputFile ReadMode >>= --Open file místo read kvůli tomu aby se vpohodě načítala diakritika a dalo se s ní pracovat
   \fileHandle -> hSetEncoding fileHandle utf8 >>
   hGetContents fileHandle >>=
   \input -> case parse (nodeParser 0)  "" input of
@@ -42,32 +48,23 @@ tryParsers pocet_mezer =  try (leafParser $ pocet_mezer + 2)  <|> try (leafParse
 --Zkontroluje odsazení, najde klíčové slovo Leaf:  a načte třídu pro daný Leaf
 leafParser :: Int -> Parser Tree
 leafParser pocet_mezer =
-  replicateM_ pocet_mezer space >>
-  string "Leaf: " >>
-  fmap Leaf (manyTill anyChar (string "\n" <|> string "\r\n"))--kvuli linux/win newlinum
-
+  replicateM_ pocet_mezer space >> string "Leaf: " >> fmap Leaf (manyTill anyChar (string "\n" <|> string "\r\n"))--kvuli linux/win newlinum
+  
 --Stejná funkce, ale pro pripad ze tam je eof -> krkolomné, ale nepodařilo se mi zkombinovat newline <|> eof v jedne funkci
 leafParserEOF :: Int -> Parser Tree
 leafParserEOF pocet_mezer =
-  replicateM_ pocet_mezer space >>
-  string "Leaf: " >>
-  fmap Leaf (manyTill anyChar eof)
-
+  replicateM_ pocet_mezer space >> string "Leaf: " >>  fmap Leaf (manyTill anyChar eof)
+ 
 --Zkontroluje odsazení, najde klíčové slovo Node: , načte index příznaku a pak celou a desetinou část prahu (aby šlo na float)
 nodeParser :: Int -> Parser Tree
-nodeParser pocet_mezer = do
-  odsazeni <- replicateM_ pocet_mezer space
-  string "Node: "
-  index_priznaku <- many1 digit
-  string ", "
-  prah_cela <- many1 digit
-  char '.'
-  prah_desetinna <- manyTill digit (string "\n" <|> string "\r\n") --kvuli linux/win newlinum
-  l <- tryParsers pocet_mezer
-  r <- tryParsers pocet_mezer
-  return (Node (read index_priznaku) (read (prah_cela ++ "." ++ prah_desetinna)) l r)
+nodeParser pocet_mezer = 
+  replicateM_ pocet_mezer space >>  string "Node: " >> many1 digit >>= \index_priznaku ->
+  string ", " >> many1 digit >>=   \prah_cela ->
+  char '.' >> manyTill digit (string "\n" <|> string "\r\n") >>= \prah_desetinna ->  --kvuli linux/win newlinum
+  tryParsers pocet_mezer >>= \l  ->
+  tryParsers pocet_mezer >>= \r ->  return (Node (read index_priznaku) (read (prah_cela ++ "." ++ prah_desetinna)) l r)
 
-
+--Funkce co vytiskne zadaný strom na out
 printTree :: Tree -> Int -> IO ()
 printTree (Leaf trida) odsazeni = putStrLn (replicate odsazeni ' ' ++ "Leaf: " ++ trida)
 printTree (Node i value l r) odsazeni = putStrLn (replicate odsazeni ' ' ++ "Node: " ++ show i ++ ", " ++ show value) >> printTree l (odsazeni + 2) >> printTree r (odsazeni + 2)
@@ -77,6 +74,7 @@ printTree (Node i value l r) odsazeni = putStrLn (replicate odsazeni ' ' ++ "Nod
 fileStringToFloats :: [String] -> [[Float]]
 fileStringToFloats = map splitOnString
 
+--Seznam floatů v stringu parsne a vrátí z toho seznam floatů
 splitOnString  :: String -> [Float]
 splitOnString  "" = []
 splitOnString  xs = read (takeWhile (/= ',') xs) : splitOnString (drop 1 (dropWhile (/= ',') xs))
@@ -102,17 +100,14 @@ getValueForComparsion index (_:xs) = getValueForComparsion (index-1) xs
 extractData :: [String] -> [TrenovaciData]
 extractData = map splitFloatsAndClass
 
---Funkce vezme jeden řádek a ten převádí na TrenovaciData, převede [String] -> [Float] pro všechny krom posledního a s poslením uloží do struktury
+--Funkce vezme jeden řádek a ten převádí na TrenovaciData, převede [String] -> [Float] pro všechny krom posledního a s poslendím uloží do struktury
 splitFloatsAndClass :: String -> TrenovaciData
-splitFloatsAndClass str = TrenovaciData (map read $ init $ splitOnStringToString str) (last $ splitOnStringToString str)
+splitFloatsAndClass radek = TrenovaciData (map read $ init $ splitOnStringToString radek) (last $ splitOnStringToString radek)
 
 --Funkce co rozdělí string do pole stiringů podle čárky
 splitOnStringToString  :: String -> [String]
 splitOnStringToString  "" = []
 splitOnStringToString  xs = takeWhile (/= ',') xs : splitOnStringToString (drop 1 (dropWhile (/= ',') xs))
-
-data TrenovaciData = TrenovaciData{floats :: [Float], trida :: String} deriving Show
-data Tree = Leaf String | Node Int Float Tree Tree deriving Show
 
 --Funkce, co dostane trénovací data a postupně rekurzivně volá rozdělovací funkce a tvoří strom
 --Pokud jeden prvek, automaticky leaf, pokud 2 a jsou stejné, tak už není co dělit a je to automaticky ta daná třída
@@ -156,20 +151,20 @@ checkGiniSplit trenovaciDataList prah index = fromIntegral (length prvni) / from
   where prvni = fst (splitTrenovaciData trenovaciDataList prah index)
         druhy = snd (splitTrenovaciData trenovaciDataList prah index)
 
--- Výpočet GiniLeft\GiniRight hodnot, kter=é se použijí výše ve splitu 1 - suma pravdepodobnosti^2
+-- Výpočet GiniLeft\GiniRight hodnot, které se použijí výše ve splitu 1 - suma pravdepodobnosti^2
 giniLeftRight :: [TrenovaciData] ->  Float
-giniLeftRight trenovaciDataList = 1.0 - sum pravdepodobnost
+giniLeftRight trenovaciDataList = 1.0 - sum pravdepodobnosti_na2
   where pocty_trid = map length $ group $ sort $ map trida trenovaciDataList -- pocet jednotlivych trid [A,C,B,A,C,C] -> [A,A,B,C,C,C] -> [AA,B,CCC]-> [2,1,3]
-        pravdepodobnost = map (\x -> (fromIntegral x / fromIntegral (length trenovaciDataList))^2) pocty_trid --(pocty_trid/celkem_trid)^2 -> pravdepodobnost vyskytu dane tridy
+        pravdepodobnosti_na2 = map (\x -> (fromIntegral x / fromIntegral (length trenovaciDataList))^2) pocty_trid --(pocty_trid/celkem_trid)^2 -> pravdepodobnost vyskytu dane tridy
 
 --Rozdělí trenovací data na 2 skupiny podle toho, jestli jsou hodnoty indexu na daném řádku větší/menší než práh
 splitTrenovaciData :: [TrenovaciData] -> Float -> Int -> ([TrenovaciData],[TrenovaciData])
 splitTrenovaciData trenovaciDataList prah index = partition (\x -> floats x !! index <= prah) trenovaciDataList
 
-printTrenovaciData:: TrenovaciData -> IO () --TODO TO DO oddelat
-printTrenovaciData trenovacidata = do
-  print (floats trenovacidata)
-  putStrLn (trida trenovacidata)
+-- printTrenovaciData:: TrenovaciData -> IO ()
+-- printTrenovaciData trenovacidata = do
+--   print (floats trenovacidata)
+--   putStrLn (trida trenovacidata)
 
 main :: IO()
 main = do
@@ -188,5 +183,5 @@ main = do
        --Print tříd pro 
        putStr .  unlines $ prochazejData file1_content $ fileStringToFloats (lines file2_content)
 
-    else putStr "Chyba pri spousteni projektu! Jedine mozne formy jsou: \n flp-fun -1 <soubor obsahujici strom> <soubor obsahujici nove data> \n flp-fun -2 <soubor obsahujici trenovaci data> "
+    else handleError "Chyba pri spousteni projektu! Jedine mozne formy jsou: \n flp-fun -1 <soubor obsahujici strom> <soubor obsahujici nove data> \n flp-fun -2 <soubor obsahujici trenovaci data> "
     return ()
