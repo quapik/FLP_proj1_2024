@@ -1,18 +1,21 @@
 --Vojtěch Šíma, xsimav01, 2024
 -- FLP Funkcionalni projekt
 import System.Environment (getArgs)
-import System.IO (openFile, hGetContents, hSetEncoding, IOMode (ReadMode))
-import Text.Parsec ((<|>), anyChar, oneOf,try, alphaNum, space, newline, manyTill, char, digit, spaces, string, many1, sepEndBy, endBy, parse, many, noneOf)
+--import System.IO (openFile, hGetContents, hSetEncoding, IOMode (ReadMode))
+import Text.Parsec ((<|>), anyChar, try, space, manyTill, char, digit, spaces, string, many1, parse)
 import Text.Parsec.String (Parser)
 import Control.Monad (replicateM_)
 import Text.Parsec.Combinator(eof)
-import GHC.IO.Encoding (utf8)
-import Data.List (group, sort, partition,transpose,elemIndex)
+--import GHC.IO.Encoding (utf8)
+import Data.List (group, sort, partition,transpose)
 import System.Exit (exitFailure)
 
 --Pužívané datové typy
 data TrenovaciData = TrenovaciData{floats :: [Float], trida :: String} deriving Show
 data Tree = Leaf String | Node Int Float Tree Tree deriving Show
+
+-- empty :: Tree
+-- empty = Leaf "Empty"
 
 ------------------------------------ARGUMENTY
 --Kontrola správně zadaných argumentů, pouze dvě možnosti, jinak chyba
@@ -27,16 +30,26 @@ fileExtract [_, file] = (file, "")
 fileExtract [_, file1, file2] = (file1,file2)
 fileExtract _ = ("", "")
 
+roundFloat :: Float -> Float
+roundFloat x = fromIntegral (truncate $ x * 10) / 10
+
 handleError :: String -> IO ()
 handleError error_msg = putStrLn ("Nekde se vystkytla chyba!\n" ++ error_msg) >> exitFailure
 
 ------------------------------------NAČÍTÁNÍ PRVNÍHO SOUBORU A JEHO PARSOVÁNÍ
 --Přečtení souboru se stromem a spuštění jeho parseru. Pokud uspěje, vrátí se načtený strom, jinak chyba
+-- readTreeInputAndParse :: FilePath -> IO Tree --co tu ten IO?
+-- readTreeInputAndParse inputFile =
+--   openFile inputFile ReadMode >>= --Open file místo read kvůli tomu aby se vpohodě načítala diakritika a dalo se s ní pracovat
+--   \fileHandle -> hSetEncoding fileHandle utf8 >>
+--   hGetContents fileHandle >>=
+--   \input -> case parse (nodeParser 0)  "" input of
+--     Left err -> error $  "Chyba pri nacitani vstupniho soboru se stromem: " ++ show err --TODO ERROR HANDLER
+--     Right loadedTree -> return loadedTree
+
 readTreeInputAndParse :: FilePath -> IO Tree --co tu ten IO?
 readTreeInputAndParse inputFile =
-  openFile inputFile ReadMode >>= --Open file místo read kvůli tomu aby se vpohodě načítala diakritika a dalo se s ní pracovat
-  \fileHandle -> hSetEncoding fileHandle utf8 >>
-  hGetContents fileHandle >>=
+  readFile inputFile >>=
   \input -> case parse (nodeParser 0)  "" input of
     Left err -> error $  "Chyba pri nacitani vstupniho soboru se stromem: " ++ show err --TODO ERROR HANDLER
     Right loadedTree -> return loadedTree
@@ -49,15 +62,15 @@ tryParsers pocet_mezer =  try (leafParser $ pocet_mezer + 2)  <|> try (leafParse
 leafParser :: Int -> Parser Tree
 leafParser pocet_mezer =
   replicateM_ pocet_mezer space >> string "Leaf: " >> fmap Leaf (manyTill anyChar (string "\n" <|> string "\r\n"))--kvuli linux/win newlinum
-  
+
 --Stejná funkce, ale pro pripad ze tam je eof -> krkolomné, ale nepodařilo se mi zkombinovat newline <|> eof v jedne funkci
 leafParserEOF :: Int -> Parser Tree
 leafParserEOF pocet_mezer =
   replicateM_ pocet_mezer space >> string "Leaf: " >>  fmap Leaf (manyTill anyChar eof)
- 
+
 --Zkontroluje odsazení, najde klíčové slovo Node: , načte index příznaku a pak celou a desetinou část prahu (aby šlo na float)
 nodeParser :: Int -> Parser Tree
-nodeParser pocet_mezer = 
+nodeParser pocet_mezer =
   replicateM_ pocet_mezer space >>  string "Node: " >> many1 digit >>= \index_priznaku ->
   string ", " >> many1 digit >>=   \prah_cela ->
   char '.' >> manyTill digit (string "\n" <|> string "\r\n") >>= \prah_desetinna ->  --kvuli linux/win newlinum
@@ -67,7 +80,7 @@ nodeParser pocet_mezer =
 --Funkce co vytiskne zadaný strom na out
 printTree :: Tree -> Int -> IO ()
 printTree (Leaf trida) odsazeni = putStrLn (replicate odsazeni ' ' ++ "Leaf: " ++ trida)
-printTree (Node i value l r) odsazeni = putStrLn (replicate odsazeni ' ' ++ "Node: " ++ show i ++ ", " ++ show value) >> printTree l (odsazeni + 2) >> printTree r (odsazeni + 2)
+printTree (Node i prah l r) odsazeni = putStrLn (replicate odsazeni ' ' ++ "Node: " ++ show i ++ ", " ++ show  prah) >> printTree l (odsazeni + 2) >> printTree r (odsazeni + 2)
 
 ------------------------------------SOUBOR s FLOATAMA
 --Funkce dostane načtený soubor rozdělený do listu podle řádků a vrací list listů floatů s jednotlivými body
@@ -115,7 +128,7 @@ vytvarejStrom :: [TrenovaciData] -> Tree
 vytvarejStrom trenovaciDataList
  | length trenovaciDataList == 1 = Leaf (trida (head trenovaciDataList))
  | length trenovaciDataList == 2, trida (head trenovaciDataList) == trida (last trenovaciDataList) = Leaf (trida (head trenovaciDataList))
- | otherwise = Node nejmensi_index prah (vytvarejStrom l) (vytvarejStrom r)
+ | otherwise = Node nejmensi_index (roundFloat prah) (vytvarejStrom l) (vytvarejStrom r)
      where intervals =  createIntervals trenovaciDataList
            nejmensi_index = fst (minimizeIntervals trenovaciDataList intervals)
            prah  = intervals !! nejmensi_index !! snd (minimizeIntervals trenovaciDataList intervals)
@@ -156,32 +169,35 @@ giniLeftRight :: [TrenovaciData] ->  Float
 giniLeftRight trenovaciDataList = 1.0 - sum pravdepodobnosti_na2
   where pocty_trid = map length $ group $ sort $ map trida trenovaciDataList -- pocet jednotlivych trid [A,C,B,A,C,C] -> [A,A,B,C,C,C] -> [AA,B,CCC]-> [2,1,3]
         pravdepodobnosti_na2 = map (\x -> (fromIntegral x / fromIntegral (length trenovaciDataList))^2) pocty_trid --(pocty_trid/celkem_trid)^2 -> pravdepodobnost vyskytu dane tridy
-
 --Rozdělí trenovací data na 2 skupiny podle toho, jestli jsou hodnoty indexu na daném řádku větší/menší než práh
 splitTrenovaciData :: [TrenovaciData] -> Float -> Int -> ([TrenovaciData],[TrenovaciData])
 splitTrenovaciData trenovaciDataList prah index = partition (\x -> floats x !! index <= prah) trenovaciDataList
 
--- printTrenovaciData:: TrenovaciData -> IO ()
--- printTrenovaciData trenovacidata = do
---   print (floats trenovacidata)
---   putStrLn (trida trenovacidata)
+-- main :: IO()
+-- main = do
+--     args <- getArgs
+--     if argsChecker args then
+--       if snd  (fileExtract args) == "" then do
+--        file2_content <- readFile (fst $ fileExtract args)
+--        let nactenaTrenovaciData = extractData (lines file2_content)
+--        printTree (vytvarejStrom nactenaTrenovaciData) 0
+--       else do
+--        file1_content <- readTreeInputAndParse (fst $ fileExtract args)
+--        file2_content <- readFile (snd $ fileExtract args)
+--        putStr .  unlines $ prochazejData file1_content $ fileStringToFloats (lines file2_content)
+
+--     else handleError "Chyba pri spousteni projektu! Jedine mozne formy jsou: \n flp-fun -1 <soubor obsahujici strom> <soubor obsahujici nove data> \n flp-fun -2 <soubor obsahujici trenovaci data> "
+--     return ()
 
 main :: IO()
 main = do
-    args <- getArgs
-    if argsChecker args then  do
-      if snd  (fileExtract args) == "" then do
-       file2_content <- readFile (fst $ fileExtract args)
-       let nactenaTrenovaciData = extractData (lines file2_content)
-       let x = vytvarejStrom nactenaTrenovaciData
-       printTree x 0
-      else do
-       file1_content <- readTreeInputAndParse (fst $ fileExtract args)
-       --putStr (printTree file1_content)
-       file2_content <- readFile (snd $ fileExtract args)
-       --print res
-       --Print tříd pro 
-       putStr .  unlines $ prochazejData file1_content $ fileStringToFloats (lines file2_content)
-
-    else handleError "Chyba pri spousteni projektu! Jedine mozne formy jsou: \n flp-fun -1 <soubor obsahujici strom> <soubor obsahujici nove data> \n flp-fun -2 <soubor obsahujici trenovaci data> "
-    return ()
+  args <- getArgs
+  let (file1, file2) = fileExtract args
+  if argsChecker args then
+    if file2 /= "" then --1 podukol
+      readTreeInputAndParse file1 >>= \file1_content ->
+      readFile file2 >>= \file2_content -> putStr .  unlines $ prochazejData file1_content $ fileStringToFloats (lines file2_content)
+    else --2 podukol
+      readFile (fst $ fileExtract args) >>= \file_content -> printTree (vytvarejStrom (extractData (lines file_content))) 0
+  else handleError "Chyba pri spousteni projektu! Jedine mozne formy jsou: \n flp-fun -1 <soubor obsahujici strom> <soubor obsahuj<soubor obsahujici nove data> \n flp-fun -2 <soubor obsahujici trenovaci data> "
+  return ()
