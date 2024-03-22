@@ -37,7 +37,7 @@ handleError :: String -> IO ()
 handleError error_msg = putStrLn ("Nekde se vystkytla chyba!\n" ++ error_msg) >> exitFailure
 
 ------------------------------------NAČÍTÁNÍ PRVNÍHO SOUBORU A JEHO PARSOVÁNÍ
-readTreeInputAndParse :: FilePath -> IO Tree 
+readTreeInputAndParse :: FilePath -> IO Tree
 readTreeInputAndParse inputFile =
   readFile inputFile >>=
   \input -> case parse (nodeParser 0)  "" input of
@@ -100,8 +100,6 @@ getValueForComparsion 0 (x:_) = x
 getValueForComparsion index (_:xs) = getValueForComparsion (index-1) xs
 
 ------------------------------------ DRUHY PODUKOL
-extractData :: [String] -> [TrenovaciData]
-extractData = map splitFloatsAndClass
 
 --Funkce vezme jeden řádek a ten převádí na TrenovaciData, převede [String] -> [Float] pro všechny krom posledního a s poslendím uloží do struktury
 splitFloatsAndClass :: String -> TrenovaciData
@@ -129,11 +127,9 @@ vytvarejStrom trenovaciDataList
 findElemIndex :: Float -> [Float]  -> Int -> Int
 findElemIndex elem (x:xs) delka = if x == elem then delka - length xs -1 else findElemIndex elem xs delka
 
---Funkce vezme pro jednotlivé float (slupce na indexech) minimum a maximum a z toho vytvoří po desetinách itnerval
+--Funkce vezme pro jednotlivé sloupce a vypočítá možné hodnoty pro tvoření splitů
 createIntervals::  [TrenovaciData] -> [[Float]]
-createIntervals trenovaciDataList = zipWith (\min max -> [min, (min + 0.1) .. max]) minValues maxValues
-  where minValues = map minimum (transpose (map floats trenovaciDataList))
-        maxValues = map maximum (transpose (map floats trenovaciDataList))
+createIntervals trenovaciDataList =  map ((\l -> [(x1 + x2) / 2 | (x1, x2) <- zip l (tail l)]) . sort) (transpose (map floats trenovaciDataList))
 
 --Funkce vezme data, intervaly a vyplivne pouze to, kde se nachází nejmenší Gsplit hodnota co se použije jako práh (index_intervalu, index_v_intervalu)
 minimizeIntervals :: [TrenovaciData] -> [[Float]] -> (Int,Int)
@@ -172,11 +168,11 @@ main = do
        file1_content <- readTreeInputAndParse (fst $ fileExtract args)
        file2_content <- readFile (snd $ fileExtract args)
        putStr .  unlines $ prochazejData file1_content $ fileStringToFloats (lines file2_content)
-      else do
+      else do --2 podukol
         file2_content <- readFile (fst $ fileExtract args)
-        let nactenaTrenovaciData = extractData (lines file2_content)
+        let nactenaTrenovaciData =  map splitFloatsAndClass (lines file2_content)
         printTree (vytvarejStrom nactenaTrenovaciData) 0
-   
+
     else handleError "Chyba pri spousteni projektu! Jedine mozne formy jsou: \n flp-fun -1 <soubor obsahujici strom> <soubor obsahujici nove data> \n flp-fun -2 <soubor obsahujici trenovaci data> "
     return ()
 
