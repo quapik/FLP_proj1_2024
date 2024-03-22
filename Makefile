@@ -4,7 +4,7 @@ FLAGS = -Wall
 
 SRC = tree.hs
 
-OUT = tree
+OUT = flp-fun
 
 all: $(OUT)	
 
