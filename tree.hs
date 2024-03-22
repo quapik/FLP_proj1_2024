@@ -2,7 +2,7 @@
 -- FLP Funkcionalni projekt
 import System.Environment (getArgs)
 --import System.IO (openFile, hGetContents, hSetEncoding, IOMode (ReadMode))
-import Text.Parsec ((<|>), anyChar, try, space, manyTill, char, digit, spaces, string, many1, parse)
+import Text.Parsec ((<|>), anyChar, try, space, manyTill, char, digit, string, many1, parse)
 import Text.Parsec.String (Parser)
 import Control.Monad (replicateM_)
 import Text.Parsec.Combinator(eof)
@@ -37,17 +37,7 @@ handleError :: String -> IO ()
 handleError error_msg = putStrLn ("Nekde se vystkytla chyba!\n" ++ error_msg) >> exitFailure
 
 ------------------------------------NAČÍTÁNÍ PRVNÍHO SOUBORU A JEHO PARSOVÁNÍ
---Přečtení souboru se stromem a spuštění jeho parseru. Pokud uspěje, vrátí se načtený strom, jinak chyba
--- readTreeInputAndParse :: FilePath -> IO Tree --co tu ten IO?
--- readTreeInputAndParse inputFile =
---   openFile inputFile ReadMode >>= --Open file místo read kvůli tomu aby se vpohodě načítala diakritika a dalo se s ní pracovat
---   \fileHandle -> hSetEncoding fileHandle utf8 >>
---   hGetContents fileHandle >>=
---   \input -> case parse (nodeParser 0)  "" input of
---     Left err -> error $  "Chyba pri nacitani vstupniho soboru se stromem: " ++ show err --TODO ERROR HANDLER
---     Right loadedTree -> return loadedTree
-
-readTreeInputAndParse :: FilePath -> IO Tree --co tu ten IO?
+readTreeInputAndParse :: FilePath -> IO Tree 
 readTreeInputAndParse inputFile =
   readFile inputFile >>=
   \input -> case parse (nodeParser 0)  "" input of
@@ -173,31 +163,32 @@ giniLeftRight trenovaciDataList = 1.0 - sum pravdepodobnosti_na2
 splitTrenovaciData :: [TrenovaciData] -> Float -> Int -> ([TrenovaciData],[TrenovaciData])
 splitTrenovaciData trenovaciDataList prah index = partition (\x -> floats x !! index <= prah) trenovaciDataList
 
--- main :: IO()
--- main = do
---     args <- getArgs
---     if argsChecker args then
---       if snd  (fileExtract args) == "" then do
---        file2_content <- readFile (fst $ fileExtract args)
---        let nactenaTrenovaciData = extractData (lines file2_content)
---        printTree (vytvarejStrom nactenaTrenovaciData) 0
---       else do
---        file1_content <- readTreeInputAndParse (fst $ fileExtract args)
---        file2_content <- readFile (snd $ fileExtract args)
---        putStr .  unlines $ prochazejData file1_content $ fileStringToFloats (lines file2_content)
-
---     else handleError "Chyba pri spousteni projektu! Jedine mozne formy jsou: \n flp-fun -1 <soubor obsahujici strom> <soubor obsahujici nove data> \n flp-fun -2 <soubor obsahujici trenovaci data> "
---     return ()
-
 main :: IO()
 main = do
-  args <- getArgs
-  let (file1, file2) = fileExtract args
-  if argsChecker args then
-    if file2 /= "" then --1 podukol
-      readTreeInputAndParse file1 >>= \file1_content ->
-      readFile file2 >>= \file2_content -> putStr .  unlines $ prochazejData file1_content $ fileStringToFloats (lines file2_content)
-    else --2 podukol
-      readFile (fst $ fileExtract args) >>= \file_content -> printTree (vytvarejStrom (extractData (lines file_content))) 0
-  else handleError "Chyba pri spousteni projektu! Jedine mozne formy jsou: \n flp-fun -1 <soubor obsahujici strom> <soubor obsahuj<soubor obsahujici nove data> \n flp-fun -2 <soubor obsahujici trenovaci data> "
-  return ()
+    args <- getArgs
+    let (file1, file2) = fileExtract args
+    if argsChecker args then
+       if file2 /= "" then do --1 podukol 
+       file1_content <- readTreeInputAndParse (fst $ fileExtract args)
+       file2_content <- readFile (snd $ fileExtract args)
+       putStr .  unlines $ prochazejData file1_content $ fileStringToFloats (lines file2_content)
+      else do
+        file2_content <- readFile (fst $ fileExtract args)
+        let nactenaTrenovaciData = extractData (lines file2_content)
+        printTree (vytvarejStrom nactenaTrenovaciData) 0
+   
+    else handleError "Chyba pri spousteni projektu! Jedine mozne formy jsou: \n flp-fun -1 <soubor obsahujici strom> <soubor obsahujici nove data> \n flp-fun -2 <soubor obsahujici trenovaci data> "
+    return ()
+
+-- main :: IO()
+-- main = do
+--   args <- getArgs
+--   let (file1, file2) = fileExtract args
+--   if argsChecker args then
+--     if file2 /= "" then --1 podukol
+--       readTreeInputAndParse file1 >>= \file1_content ->
+--       readFile file2 >>= (\file2_content -> putStr .  unlines $ prochazejData file1_content $ fileStringToFloats (lines file2_content))
+--     else --2 podukol
+--       readFile (fst $ fileExtract args) >>= (\file_content -> printTree (vytvarejStrom (extractData (lines file_content))) 0)
+--   else handleError "Chyba pri spousteni projektu! Jedine mozne formy jsou: \n flp-fun -1 <soubor obsahujici strom> <soubor obsahuj<soubor obsahujici nove data> \n flp-fun -2 <soubor obsahujici trenovaci data> "
+--   return ()
