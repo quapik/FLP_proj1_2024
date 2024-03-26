@@ -1,0 +1,130 @@
+	Mon Mar 25 14:39 2024 Time and Allocation Profiling Report  (Final)
+
+	   tree.exe +RTS -p -RTS -2 iris_all.csv
+
+	total time  =        0.12 secs   (120 ticks @ 1000 us, 1 processor)
+	total alloc = 1,328,929,232 bytes  (excludes profiling overheads)
+
+COST CENTRE                          MODULE    SRC                        %time %alloc
+
+giniLeftRight.pocty_trid             Main      tree.hs:149:9-76            70.0   38.5
+splitTrenovaciData.\                 Main      tree.hs:153:68-92           10.0   14.7
+splitTrenovaciData                   Main      tree.hs:153:1-111            7.5   34.0
+giniLeftRight.pravdepodobnosti_na2.\ Main      tree.hs:150:43-159           3.3    3.8
+giniLeftRight                        Main      tree.hs:(148,1)-(150,171)    2.5    3.2
+floats                               Main      tree.hs:12:36-41             2.5    0.0
+checkGiniSplit                       Main      tree.hs:(142,1)-(144,69)     1.7    2.8
+
+
+                                                                                                                      individual      inherited
+COST CENTRE                                     MODULE                   SRC                       no.     entries  %time %alloc   %time %alloc
+
+MAIN                                            MAIN                     <built-in>                200           0    0.0    0.0   100.0  100.0
+ CAF                                            GHC.Read                 <entire-module>           331           0    0.0    0.0     0.0    0.0
+ CAF                                            GHC.IO.StdHandles        <entire-module>           315           0    0.0    0.0     0.0    0.0
+ CAF                                            GHC.IO.Handle.Internals  <entire-module>           310           0    0.0    0.0     0.0    0.0
+ CAF                                            GHC.IO.Handle.FD         <entire-module>           309           0    0.0    0.0     0.0    0.0
+ CAF                                            GHC.IO.FD                <entire-module>           307           0    0.0    0.0     0.0    0.0
+ CAF                                            GHC.IO.Exception         <entire-module>           306           0    0.0    0.0     0.0    0.0
+ CAF                                            GHC.IO.Encoding.CodePage <entire-module>           297           0    0.0    0.0     0.0    0.0
+ CAF                                            GHC.IO.Encoding          <entire-module>           296           0    0.0    0.0     0.0    0.0
+ CAF                                            GHC.Float                <entire-module>           284           0    0.0    0.0     0.0    0.0
+ CAF                                            Main                     <entire-module>           207           0    0.0    0.0     0.0    0.0
+  main                                          Main                     tree.hs:(156,1)-(170,13)  400           1    0.0    0.0     0.0    0.0
+ main                                           Main                     tree.hs:(156,1)-(170,13)  401           0    0.0    0.0   100.0  100.0
+  printTree                                     Main                     tree.hs:(69,1)-(70,176)   407         293    0.0    0.2     0.0    0.2
+  vytvarejStrom                                 Main                     tree.hs:(108,1)-(116,78)  408         293    0.0    0.0   100.0   99.4
+   trida                                        Main                     tree.hs:12:55-59          493         153    0.0    0.0     0.0    0.0
+   vytvarejStrom.l                              Main                     tree.hs:115:12-78         489         146    0.0    0.0     0.0    0.1
+    splitTrenovaciData                          Main                     tree.hs:153:1-111         490         146    0.0    0.0     0.0    0.1
+     splitTrenovaciData.\                       Main                     tree.hs:153:68-92         491        4066    0.0    0.0     0.0    0.0
+      floats                                    Main                     tree.hs:12:36-41          492        4066    0.0    0.0     0.0    0.0
+   vytvarejStrom.nejmensi_index                 Main                     tree.hs:113:12-90         410         146    0.0    0.0    39.2   44.3
+    minimizeSplitValues                         Main                     tree.hs:(129,1)-(133,62)  411         146    0.0    0.0    39.2   44.3
+     minimizeSplitValues.index_sloupce          Main                     tree.hs:132:9-104         412         146    0.0    0.0     0.0    0.0
+      findElemIndex                             Main                     tree.hs:(120,1)-(121,24)  413         146    0.0    0.0     0.0    0.0
+     minimizeSplitValues.nejmensi_splity        Main                     tree.hs:130:9-117         414         146    0.0    0.0    39.2   44.3
+      findMinInPossibleSplitValues              Main                     tree.hs:(137,1)-(138,102) 420         730    0.0    0.1    39.2   44.2
+       checkGiniSplit                           Main                     tree.hs:(142,1)-(144,69)  422       19600    1.7    1.3    39.2   44.1
+        giniLeftRight                           Main                     tree.hs:(148,1)-(150,171) 427       39200    0.8    1.4    26.7   20.8
+         giniLeftRight.pocty_trid               Main                     tree.hs:149:9-76          429       39200   23.3   17.3    24.2   17.3
+          trida                                 Main                     tree.hs:12:55-59          435      784466    0.8    0.0     0.8    0.0
+         giniLeftRight.pravdepodobnosti_na2     Main                     tree.hs:150:9-171         428       39200    0.0    0.3     1.7    2.0
+          giniLeftRight.pravdepodobnosti_na2.\  Main                     tree.hs:150:43-159        430       41763    1.7    1.7     1.7    1.7
+        checkGiniSplit.druhy                    Main                     tree.hs:144:9-69          431       19600    0.0    0.1     5.0   11.0
+         splitTrenovaciData                     Main                     tree.hs:153:1-111         432       19600    3.3    7.6     5.0   11.0
+          splitTrenovaciData.\                  Main                     tree.hs:153:68-92         433      785970    1.7    3.3     1.7    3.3
+           floats                               Main                     tree.hs:12:36-41          434      785970    0.0    0.0     0.0    0.0
+        checkGiniSplit.prvni                    Main                     tree.hs:143:9-69          423       19600    0.0    0.1     5.8   11.0
+         splitTrenovaciData                     Main                     tree.hs:153:1-111         424       19600    0.8    7.6     5.8   11.0
+          splitTrenovaciData.\                  Main                     tree.hs:153:68-92         425      785970    5.0    3.3     5.0    3.3
+           floats                               Main                     tree.hs:12:36-41          426      785970    0.0    0.0     0.0    0.0
+   vytvarejStrom.possibleSplitValue             Main                     tree.hs:112:12-76         415         146    0.0    0.0     0.0    1.0
+    createPossibleSplitValues                   Main                     tree.hs:125:1-155         416         146    0.0    0.7     0.0    1.0
+     floats                                     Main                     tree.hs:12:36-41          417        4066    0.0    0.0     0.0    0.0
+     createPossibleSplitValues.\                Main                     tree.hs:125:60-103        421         730    0.0    0.4     0.0    0.4
+   vytvarejStrom.prah                           Main                     tree.hs:114:12-121        436         146    0.0    0.0    60.8   54.0
+    minimizeSplitValues                         Main                     tree.hs:(129,1)-(133,62)  437         146    0.0    0.0    60.8   54.0
+     minimizeSplitValues.index_sloupce          Main                     tree.hs:132:9-104         439         146    0.0    0.0     0.0    0.0
+      findElemIndex                             Main                     tree.hs:(120,1)-(121,24)  440         146    0.0    0.0     0.0    0.0
+     minimizeSplitValues.index_v_splitvalues    Main                     tree.hs:133:9-62          438         146    0.0    0.0     0.0    0.0
+     minimizeSplitValues.nejmensi_indexy        Main                     tree.hs:131:9-117         457         146    0.0    0.0     9.2    9.7
+      findMinInPossibleSplitValues              Main                     tree.hs:(137,1)-(138,102) 458         146    0.0    0.0     9.2    9.7
+       checkGiniSplit                           Main                     tree.hs:(142,1)-(144,69)  460         244    0.0    0.0     0.0    0.9
+        giniLeftRight                           Main                     tree.hs:(148,1)-(150,171) 465         488    0.0    0.0     0.0    0.4
+         giniLeftRight.pocty_trid               Main                     tree.hs:149:9-76          467         488    0.0    0.3     0.0    0.3
+          trida                                 Main                     tree.hs:12:55-59          473       16170    0.0    0.0     0.0    0.0
+         giniLeftRight.pravdepodobnosti_na2     Main                     tree.hs:150:9-171         466         488    0.0    0.0     0.0    0.0
+          giniLeftRight.pravdepodobnosti_na2.\  Main                     tree.hs:150:43-159        468         636    0.0    0.0     0.0    0.0
+        checkGiniSplit.druhy                    Main                     tree.hs:144:9-69          469         244    0.0    0.0     0.0    0.2
+         splitTrenovaciData                     Main                     tree.hs:153:1-111         470         244    0.0    0.2     0.0    0.2
+          splitTrenovaciData.\                  Main                     tree.hs:153:68-92         471       16316    0.0    0.1     0.0    0.1
+           floats                               Main                     tree.hs:12:36-41          472       16316    0.0    0.0     0.0    0.0
+        checkGiniSplit.prvni                    Main                     tree.hs:143:9-69          461         244    0.0    0.0     0.0    0.2
+         splitTrenovaciData                     Main                     tree.hs:153:1-111         462         244    0.0    0.2     0.0    0.2
+          splitTrenovaciData.\                  Main                     tree.hs:153:68-92         463       16316    0.0    0.1     0.0    0.1
+           floats                               Main                     tree.hs:12:36-41          464       16316    0.0    0.0     0.0    0.0
+       findElemIndex                            Main                     tree.hs:(120,1)-(121,24)  459         244    0.0    0.0     0.0    0.0
+       findMinInPossibleSplitValues.minsplit    Main                     tree.hs:138:9-102         474         146    0.0    0.0     9.2    8.8
+        checkGiniSplit                          Main                     tree.hs:(142,1)-(144,69)  475        3920    0.0    0.3     9.2    8.8
+         giniLeftRight                          Main                     tree.hs:(148,1)-(150,171) 480        7840    0.8    0.3     8.3    4.2
+          giniLeftRight.pocty_trid              Main                     tree.hs:149:9-76          482        7840    6.7    3.5     6.7    3.5
+           trida                                Main                     tree.hs:12:55-59          488      156902    0.0    0.0     0.0    0.0
+          giniLeftRight.pravdepodobnosti_na2    Main                     tree.hs:150:9-171         481        7840    0.0    0.1     0.8    0.4
+           giniLeftRight.pravdepodobnosti_na2.\ Main                     tree.hs:150:43-159        483        8234    0.8    0.3     0.8    0.3
+         checkGiniSplit.druhy                   Main                     tree.hs:144:9-69          484        3920    0.0    0.0     0.8    2.2
+          splitTrenovaciData                    Main                     tree.hs:153:1-111         485        3920    0.0    1.5     0.8    2.2
+           splitTrenovaciData.\                 Main                     tree.hs:153:68-92         486      157194    0.0    0.7     0.8    0.7
+            floats                              Main                     tree.hs:12:36-41          487      157194    0.8    0.0     0.8    0.0
+         checkGiniSplit.prvni                   Main                     tree.hs:143:9-69          476        3920    0.0    0.0     0.0    2.2
+          splitTrenovaciData                    Main                     tree.hs:153:1-111         477        3920    0.0    1.5     0.0    2.2
+           splitTrenovaciData.\                 Main                     tree.hs:153:68-92         478      157194    0.0    0.7     0.0    0.7
+            floats                              Main                     tree.hs:12:36-41          479      157194    0.0    0.0     0.0    0.0
+     minimizeSplitValues.nejmensi_splity        Main                     tree.hs:130:9-117         441         146    0.0    0.0    51.7   44.3
+      findMinInPossibleSplitValues              Main                     tree.hs:(137,1)-(138,102) 442         730    0.0    0.1    51.7   44.2
+       checkGiniSplit                           Main                     tree.hs:(142,1)-(144,69)  443       19600    0.0    1.3    51.7   44.1
+        giniLeftRight                           Main                     tree.hs:(148,1)-(150,171) 448       39200    0.8    1.4    41.7   20.8
+         giniLeftRight.pocty_trid               Main                     tree.hs:149:9-76          450       39200   40.0   17.3    40.0   17.3
+          trida                                 Main                     tree.hs:12:55-59          456      784466    0.0    0.0     0.0    0.0
+         giniLeftRight.pravdepodobnosti_na2     Main                     tree.hs:150:9-171         449       39200    0.0    0.3     0.8    2.0
+          giniLeftRight.pravdepodobnosti_na2.\  Main                     tree.hs:150:43-159        451       41763    0.8    1.7     0.8    1.7
+        checkGiniSplit.druhy                    Main                     tree.hs:144:9-69          452       19600    0.8    0.1     4.2   11.0
+         splitTrenovaciData                     Main                     tree.hs:153:1-111         453       19600    0.8    7.6     3.3   11.0
+          splitTrenovaciData.\                  Main                     tree.hs:153:68-92         454      785970    1.7    3.3     2.5    3.3
+           floats                               Main                     tree.hs:12:36-41          455      785970    0.8    0.0     0.8    0.0
+        checkGiniSplit.prvni                    Main                     tree.hs:143:9-69          444       19600    0.8    0.1     5.8   11.0
+         splitTrenovaciData                     Main                     tree.hs:153:1-111         445       19600    2.5    7.6     5.0   11.0
+          splitTrenovaciData.\                  Main                     tree.hs:153:68-92         446      785970    1.7    3.3     2.5    3.3
+           floats                               Main                     tree.hs:12:36-41          447      785970    0.8    0.0     0.8    0.0
+   vytvarejStrom.r                              Main                     tree.hs:116:12-78         494         146    0.0    0.0     0.0    0.1
+    splitTrenovaciData                          Main                     tree.hs:153:1-111         495         146    0.0    0.0     0.0    0.1
+     splitTrenovaciData.\                       Main                     tree.hs:153:68-92         496        4066    0.0    0.0     0.0    0.0
+      floats                                    Main                     tree.hs:12:36-41          497        4066    0.0    0.0     0.0    0.0
+  argsChecker                                   Main                     tree.hs:(18,1)-(20,22)    402           1    0.0    0.0     0.0    0.0
+  main.(...)                                    Main                     tree.hs:158:9-41          404           1    0.0    0.0     0.0    0.0
+   fileExtract                                  Main                     tree.hs:(24,1)-(26,24)    405           1    0.0    0.0     0.0    0.0
+  main.file1                                    Main                     tree.hs:158:9-41          406           1    0.0    0.0     0.0    0.0
+  main.file2                                    Main                     tree.hs:158:9-41          403           1    0.0    0.0     0.0    0.0
+  main.nactenaTrenovaciData                     Main                     tree.hs:166:13-81         409           1    0.0    0.1     0.0    0.3
+   splitFloatsAndClass                          Main                     tree.hs:98:1-126          418         150    0.0    0.3     0.0    0.3
+    splitOnStringToString                       Main                     tree.hs:(102,1)-(103,106) 419        2100    0.0    0.0     0.0    0.0

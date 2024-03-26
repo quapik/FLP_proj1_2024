@@ -1,7 +1,7 @@
 --Vojtěch Šíma, xsimav01, 2024
 -- FLP Funkcionalni projekt
 import System.Environment (getArgs)
-import Text.Parsec ((<|>), anyChar, try, space, manyTill, char, digit, string, many1, parse)
+import Text.Parsec ((<|>), anyChar, try, space, manyTill, char, digit, string, many1, parse,alphaNum)
 import Text.Parsec.String (Parser)
 import Control.Monad (replicateM_)
 import Text.Parsec.Combinator(eof)
@@ -33,7 +33,7 @@ readTreeInputAndParse :: FilePath -> IO Tree
 readTreeInputAndParse inputFile =
   readFile inputFile >>=
   \input -> case parse (nodeParser 0)  "" input of
-    Left err -> error $  "Chyba pri nacitani vstupniho soboru se stromem: " ++ show err
+    Left err -> error $  "Chyba pri nacitani vstupniho soboru se stromem: " ++ inputFile ++ show err
     Right loadedTree -> return loadedTree
 
 --Vyzkouší všechny parsery co mohou být 
@@ -57,9 +57,9 @@ nodeParser pocet_mezer = do
   _ <- string "Node: "
   index_priznaku <- many1 digit
   _ <- string ", "
-  prah_cela <- many1 digit
+  prah_cela <- many1 alphaNum
   _ <- char '.'
-  prah_desetinna <- manyTill digit (string "\n" <|> string "\r\n") --kvuli linux/win newlinum
+  prah_desetinna <- manyTill (digit <|> char 'e' <|> char '-')  (string "\n" <|> string "\r\n") --kvuli linux/win newlinum
   l <- tryParsers pocet_mezer
   r <- tryParsers pocet_mezer
   return (Node (read index_priznaku) (read (prah_cela ++ "." ++ prah_desetinna)) l r)
