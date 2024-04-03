@@ -1,15 +1,15 @@
-GHCC = ghc
+GHC = ghc
 
 FLAGS = -Wall
 
-SRC = tree.hs
+SRC = flp-fun.hs
 
 OUT = flp-fun
 
 all: $(OUT)	
 
 $(OUT): $(SRC)
-	$(GHCC) $(FLAGS) -o $@ $<
+	$(GHC) $(FLAGS) -o $@ $<
 
 clean:
 	rm -f $(OUT) *.o *.hi

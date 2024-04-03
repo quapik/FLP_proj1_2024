@@ -1,0 +1,7 @@
+Podařilo se vyřešit vše, bohužel v druhé části jsem po zveřejnění testů zjistil, že její zpracovávání
+je velmi časově náročné. Problém je dle profilingu  v počítání jednotlivých počentostí tříd, které se počítají 
+vždy když se má vypočítávat hodnota GiniSplitu podle které se rozhoduje který bude použit. Prvotně jsem 
+používal sort a group, pak filter a partition až jsem došel k řešení s Map (popsáno i v kodu), ale ani tak
+se mi nepodařilo vyřešit aby to bylo tak rychlé jak se předpokládá. Pravděopodobně bude něco implnementováno,
+pomalu ještě někde jinde, bohužel se mi to však nepodařilo odhalit a vyřešit včas.
+Funkcinalita by však měla být správná.
